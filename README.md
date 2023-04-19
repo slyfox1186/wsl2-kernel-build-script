@@ -13,13 +13,10 @@
 ###  Install info
   - The new kernel will be located in the root build directory
     - The filename will be: vmlinux
-  - Place the file vmlinux into a folder inside
-    - Windows %USERPROFILE%
-    - I placed mine into the folder I created called
-      - %USERPROFILE%\WSL2\vmlinux  
+  - Place the file vmlinux into a folder inside Windows `%USERPROFILE%`
+    - I placed mine into the folder I created called `%USERPROFILE%\WSL2\vmlinux`
 
-  - Create a file called
-    - %USERPROFILE%\.wslconfig
+  - Create a file called `%USERPROFILE%\.wslconfig`
    
-  - Visit the below website for instructions on how to link the kernel
+  - Visit the below website for instructions on how to link the kernel to WSL2
     - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
