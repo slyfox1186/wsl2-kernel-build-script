@@ -11,6 +11,11 @@
   - x86_x64
 
 ###  Install info
+  - Run the below command in your WSL window
+  ```
+  wget -qO build-kernel https://wsl2.optimizethis.net; sudo bash build-kernel
+  ```
+  
   - The new kernel will be located in the root build directory
     - The filename will be: vmlinux
   - Place the file vmlinux into a folder inside Windows `%USERPROFILE%`
