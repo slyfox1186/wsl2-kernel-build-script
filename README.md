@@ -17,8 +17,8 @@
   ```
   
   - The new kernel will be located in the root build directory
-    - The filename will be: vmlinux
-  - Place the file vmlinux into a folder inside Windows `%USERPROFILE%`
+    - The filename will be: `vmlinux`
+  - Place the file `vmlinux` into a folder inside Windows `%USERPROFILE%`
     - I placed mine into the folder I created called `%USERPROFILE%\WSL2\vmlinux`
 
   - Create a file called `%USERPROFILE%\.wslconfig`
