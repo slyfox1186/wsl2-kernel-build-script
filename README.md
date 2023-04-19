@@ -23,5 +23,8 @@
 
   - Create a file called `%USERPROFILE%\.wslconfig`
    
-  - Visit the below website for instructions on how to link the kernel to WSL2
+  - Visit the below website for instructions on how to link the kernel to WSL2 
     - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
+  - You can also check out my person script that I use as well for ideas.
+
+    My personal [.wslconfig](https://raw.githubusercontent.com/slyfox1186/Windows-WSL2-Kernel-build-script/main/.wslconfig) file
