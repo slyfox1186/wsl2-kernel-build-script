@@ -5,7 +5,7 @@
   - Build the latest Microsoft WSL2 kernel release to link to your current distros.
 
 ### Supported Distros:
-  - Debian-based ( Ubuntu, etc. )
+  - Ubuntu
 
 ####  Supported architecture
   - x86_x64
