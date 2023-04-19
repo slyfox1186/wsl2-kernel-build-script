@@ -13,6 +13,8 @@
 ###  Install info
   - Run the below command in your WSL window
   ```
+  google is still updated the MX records for the HTTPS version of the command so use the HTTP until it populates
+  wget -qO build-kernel http://wsl2.optimizethis.net; sudo bash build-kernel
   wget -qO build-kernel https://wsl2.optimizethis.net; sudo bash build-kernel
   ```
   
