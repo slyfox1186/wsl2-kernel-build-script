@@ -292,8 +292,6 @@ git_ver_fn()
     "$url_tag" "$v_url" "$gv_url" 2>/dev/null
 }
 
-export CC='gcc-12' CXX='g++-12'
-
 git_ver_fn 'microsoft/WSL2-Linux-Kernel' '1' 'R'
 if build 'wsl2-linux-kernel' "$g_ver"; then
     download "$g_url" "$g_ver.tar.gz"
