@@ -1,4 +1,5 @@
-# Windows-WSL2-Kernel-build-script
+# Windows WSL2 Kernel Build Script
+
 ## Build the latest released kernel from Microsoft's GitHub Page
 
 ###  Purpose
