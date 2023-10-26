@@ -28,4 +28,4 @@
   - Visit the below website for instructions on how to link the kernel to WSL2 
     - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
 
-  - This is my personal `.wslconfig` [script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig) that you can use to help understand the file formatting
+  - This is my personal [.wslconfig script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig) that you can use to help understand the file formatting
