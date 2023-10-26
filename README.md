@@ -13,8 +13,14 @@
 
 ###  Install info
   - Run the below command in your WSL window
-  ```
+  ```bash
   curl -Lso build-kernel https://wsl2-kernel.optimizethis.net
+  sudo bash build-kernel
+  ```
+  - You can also clone the repo
+  ```bash
+  git clone https://github.com/slyfox1186/wsl2-kernel-build-script.git
+  cd wsl2-kernel-build-script
   sudo bash build-kernel
   ```
   
