@@ -13,7 +13,8 @@
 ###  Install info
   - Run the below command in your WSL window
   ```
-  wget -qO build-kernel https://wsl2.optimizethis.net; sudo bash build-kernel
+  wget --show-progress -cqO 'build-kernel' 'https://wsl2-kernel.optimizethis.net'
+  sudo bash build-kernel
   ```
   
   - The new kernel will be located in the root build directory
