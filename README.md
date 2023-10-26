@@ -25,4 +25,4 @@
    
   - Visit the below website for instructions on how to link the kernel to WSL2 
     - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
-  - You can also check out my personal [script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig) that I use for ideas on how to format.
+    - You can also check out my personal [script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig) that I use for ideas on how to format.
