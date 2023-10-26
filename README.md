@@ -1,6 +1,6 @@
 # Windows WSL2 Kernel Build Script
 
-## Build the latest released kernel from Microsoft's GitHub Page
+## Build the latest released kernel from Microsoft's [GitHub](https://github.com/microsoft/WSL2-Linux-Kernel/) Page
 
 ###  Purpose
   - Build the latest Microsoft WSL2 kernel release to link to your current distros.
