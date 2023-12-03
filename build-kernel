@@ -27,10 +27,10 @@ prompt_fn()
     local answer
     clear
 
-    printf "%s\n\n%s\n%s\n%s\n\n" \
+    printf "%s\n\n%s\n%s\n%s\n\n"    \
         'Choose the kernel version:' \
-        '[1] 5.15.133.1 (10.06.23)' \
-        '[2] 6.1.21.2 (07.25.23)' \
+        '[1] 5.15.133.1 (10.06.23)'  \
+        '[2] 6.1.21.2 (07.25.23)'    \
         '[3] Exit'
     read -p 'Your choices are (1 to 3): ' answer
     clear
@@ -111,8 +111,8 @@ export PATH
 
 exit_fn()
 {
-    printf "\n%s\n\n%s\n%s\n\n" \
-        'The script has completed' \
+    printf "\n%s\n\n%s\n%s\n\n"                                   \
+        'The script has completed'                                \
         'Make sure to star this repository to show your support!' \
         "${web_repo}"
     exit 0
@@ -120,8 +120,8 @@ exit_fn()
 
 fail_fn()
 {
-    printf "\n\n%s\n\n%s\n\n%s\n\n" \
-        "${1}" \
+    printf "\n\n%s\n\n%s\n\n%s\n\n"                              \
+        "${1}"                                                   \
         'Please create a support ticket so I can work on a fix.' \
         "${web_repo}/issues"
     exit 1
