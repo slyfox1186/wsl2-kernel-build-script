@@ -40,9 +40,6 @@ prompt_fn()
         2)      archive_url='https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-6.1.21.2.tar.gz';;
         3)      exit 0;;
         *)
-                clear
-                printf "%s\n\n" 'Bad user input. Reverting script...'
-                sleep 3
                 unset answer
                 prompt_fn
                 ;;
