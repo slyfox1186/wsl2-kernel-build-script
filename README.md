@@ -24,14 +24,14 @@
   sudo bash build-kernel
   ```
   
-  - The new kernel will be located in the root build directory
+  - The new kernel will be moved to the same directory as the install script `build-kernel`
     - The filename will be: `vmlinux`
-  - Place the file `vmlinux` into a folder inside Windows `%USERPROFILE%`
-    - I placed mine into the folder I created called `%USERPROFILE%\WSL2\vmlinux`
+  - Place the file `vmlinux` into a folder inside the Windows directory `%USERPROFILE%`
+    - I placed mine into a folder I created called `%USERPROFILE%\WSL2\vmlinux`
 
-  - Create a file called `%USERPROFILE%\.wslconfig`
+  - Next, create a file called `%USERPROFILE%\.wslconfig`
    
-  - Visit the below website for instructions on how to link the kernel to WSL2 
+  - Now, visit the below website for instructions on how to link the kernel to WSL2 
     - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
 
-  - This is my personal [.wslconfig script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig) that you can use to help understand the file formatting
+  - An example of the `.wslconfig` file is [.wslconfig script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig). You can use it to help understand the file formatting
