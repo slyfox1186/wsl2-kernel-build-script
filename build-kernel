@@ -1,8 +1,26 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2162,SC2317
+
+#####################################################################################################
+##
+##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
+##
+##  Purpose: Build Official WSL2 Kernels
+##
+##  Updated: 01.07.24
+##
+##  Script version: 2.5
+##
+#####################################################################################################
 
 clear
 
-# Define the program name and build directory
+if [ "${EUID}" -eq '0' ]; then
+    printf "%s\n\n" 'You must run this script WITHOUT root/sudo.'
+    exit 1
+fi
+
+# Define the program name and an output directory
 program_name='wsl2-kernel'
 script_dir="$PWD"
 cwd="$script_dir/$program_name-build-script"
