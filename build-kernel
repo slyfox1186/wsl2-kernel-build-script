@@ -1,184 +1,132 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2162,SC2317
 
-#####################################################################################################
-##
-##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
-##
-##  Purpose: Build Official WSL2 Kernels
-##
-##  Updated: 12.30.23
-##
-##  Script version: 2.4
-##
-#####################################################################################################
+clear
 
-if [ "${EUID}" -eq '0' ]; then
-    printf "%s\n\n" 'You must run this script WITHOUT root/sudo.'
-    exit 1
-fi
+# Define the program name and build directory
+program_name='wsl2-kernel'
+script_dir="$PWD"
+cwd="$script_dir/$program_name-build-script"
 
-#
-# PROMPT THE USER TO CHOOSE THE KERNEL VERSION
-#
+# Create and change to the build directory
+mkdir -p "$cwd"
+cd "$cwd" || exit 1
 
-prompt_fn()
+# Set compiler optimizations
+CC='gcc'
+CXX='g++'
+CFLAGS='-g -O3 -pipe -march=native'
+CXXFLAGS="$CFLAGS"
+
+export CC CXX CFLAGS CXXFLAGS
+
+is_aria2c_installed()
 {
-    local answer
-    clear
-
-    printf "%s\n\n%s\n%s\n%s\n\n"    \
-        'Choose the kernel version:' \
-        '[1] 5.15.137.3 (12.18.23)'  \
-        '[2] 6.1.21.2 (07.25.23)'    \
-        '[3] Exit'
-    read -p 'Your choices are (1 to 3): ' answer
-    clear
-
-    case "${answer}" in
-        1)      archive_url='https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-5.15.137.3.tar.gz';;
-        2)      archive_url='https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-6.1.21.2.tar.gz';;
-        3)      exit 0;;
-        *)
-                unset answer
-                prompt_fn
-                ;;
-     esac
-}
-prompt_fn
-
-#
-# SET VARIABLES
-#
-
-script_ver=2.4
-cwd="${PWD}"/wsl-build-script
-archive_ver="$(echo "${archive_url}" | sed 's/^.*\/.*-wsl-\(.*\)\.tar\.gz$/\1/')"
-archive_dir="${cwd}/wsl-kernel-${archive_ver}"
-archive_ext="${archive_url//*.}"
-archive_name="${archive_dir}.tar.${archive_ext}"
-user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-web_repo=https://github.com/slyfox1186/script-repo
-
-printf "\n%s\n%s\n\n"                    \
-    "WSL2 Build Script - v${script_ver}" \
-    '==============================================='
-
-#
-# CREATE OUTPUT DIRECTORY
-#
-
-if [ ! -d "${cwd}" ]; then
-    mkdir -p "${cwd}"
-fi
-
-#
-# SET THE C + CXX COMPILERS
-#
-
-export CC=gcc CXX=g++
-
-#
-# SET COMPILER OPTIMIZATION FLAGS
-#
-
-export {CFLAGS,CXXFLAGS}='-g -O2 -march=native'
-
-#
-# SET PATH
-#
-
-PATH="\
-/usr/lib/ccache:\
-$HOME/.cargo/bin:\
-$HOME/.local/bin:\
-/usr/local/sbin:\
-/usr/local/bin:\
-/usr/sbin:\
-/usr/bin:\
-/sbin:\
-/bin:\
-/usr/local/cuda/bin\
-"
-export PATH
-
-#
-# CREATE FUNCTIONS
-#
-
-exit_fn()
-{
-    printf "\n%s\n\n%s\n%s\n\n"                                   \
-        'The script has completed'                                \
-        'Make sure to star this repository to show your support!' \
-        "${web_repo}"
-    exit 0
+    command -v aria2c > /dev/null 2>&1
+    return $?
 }
 
-fail_fn()
+get_latest_release_version()
 {
-    printf "\n\n%s\n\n%s\n\n%s\n\n"                              \
-        "${1}"                                                   \
-        'Please create a support ticket so I can work on a fix.' \
-        "${web_repo}/issues"
-    exit 1
+    repo_url='https://github.com/microsoft/WSL2-Linux-Kernel'
+    latest_release_tag=$(curl -s "$repo_url/tags" | grep -oP 'href="/microsoft/WSL2-Linux-Kernel/releases/tag/\K[^"]+' | head -1)
+    echo "$latest_release_tag"
 }
 
-#
-# INSTALL REQUIRED APT PACKAGES
-#
+download_file()
+{
+    url=$1
+    output_file=$2
 
-pkgs=(autoconf autogen automake bc binutils bison build-essential ccache
-      curl dbus-x11 dwarves flex git jq libelf-dev libperl-dev libssl-dev
-      libtalloc-dev libtbbmalloc2 libtool libtool-bin lzip m4 nasm texinfo
-      unzip uuid-dev wget xclip xsel yasm)
-
-for i in ${pkgs[@]}
-do
-    missing_pkg="$(sudo dpkg -l | grep -o "${i}")"
-
-    if [ -z "${missing_pkg}" ]; then
-        missing_pkgs+=" ${i}"
+    if is_aria2c_installed; then
+        echo 'Downloading with aria2c...'
+        aria2c -x 16 -s 16 -o "$output_file" "$url"
+    else
+        echo 'Downloading with wget...'
+        wget --show-progress -cqO "$output_file" "$url"
     fi
-done
+}
 
-if [ -n "${missing_pkgs}" ]; then
-    sudo apt -y install ${missing_pkgs}
-    clear
-fi
+install_required_packages()
+{
+    packages=(dwarves libelf-dev libssl-dev build-essential flex bison
+              libncurses-dev libncurses5 libncursesw5 libncursesw5-dev
+              pkg-config)
+    missing_packages=()
 
-#
-# DOWNLOAD THE ARCHIVE FILE
-#
+    for pkg in "${packages[@]}"
+    do
+        if ! dpkg -l | grep -qw "$pkg"; then
+            missing_packages+=("$pkg")
+        fi
+    done
 
-if [ ! -f "${archive_name}" ]; then
-    printf "%s\n\n" 'Downloading the source code from GitHub...'
-    wget --show-progress -U "${user_agent}" -cqO "${archive_name}" "${archive_url}"
-fi
+    if [ ${#missing_packages[@]} -ne 0 ]; then
+        printf "%s\n\n" "Installing missing packages: ${missing_packages[*]}"
+        sudo apt update
+        sudo apt -y install "${missing_packages[@]}"
+    fi
+}
 
-#
-# CREATE THE OUTPUT DIRECTORY
-#
+install_kernel()
+{
+    # Check if aria2c is installed 
+    if is_aria2c_installed; then
+        echo "aria2c is already installed."
+    else
+        echo "aria2c is not installed. Installing aria2c..."
+        sudo apt update
+        sudo apt -y install aria2
+        if is_aria2c_installed; then
+            echo "aria2c has been successfully installed."
+        else
+            echo "Failed to install aria2c. Please check for errors."
+        fi
+    fi
 
-if [ -d "${archive_dir}" ]; then
-    sudo rm -fr "${archive_dir}"
-fi
-mkdir -p "${archive_dir}"
+    version=$(get_latest_release_version)
+    if [ -z "$version" ]; then
+        printf "%s\n\n" 'Failed to find the latest version. Exiting.'
+        exit 1
+    fi
 
-#
-# EXTRACT THE ARCHIVE FILES INTO THE OUTPUT DIRECTORY
-#
+    tar_file="$program_name-$version.tar.gz"
+    download_url="https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz"
 
-if ! tar -xf "${archive_name}" -C "${archive_dir}" --strip-components 1; then
-    fail_fn "Failed to extract the archive files. Line: ${LINENO}"
-fi
+    download_file "$download_url" "$tar_file"
 
-#
-# BUILD PROGRAM FROM SOURCE
-#
+    extract_dir="$program_name-$version"
+    [ -d "$extract_dir" ] && rm -rf "$extract_dir"
 
-cd "${archive_dir}" || exit 1
-echo 'yes' | make "-j$(nproc --all)" KCONFIG_CONFIG='Microsoft/config-wsl'
+    mkdir -p "$extract_dir"
+    if ! tar -zxf "$tar_file" -C "$extract_dir" --strip-components 1; then
+        printf "%s\n\n" 'Failed to extract the archive. Exiting.'
+        exit 1
+    fi
 
-# SHOW EXIT MESSAGE
-exit_fn
+    cd "$extract_dir" || exit 1
+    printf "%s\n\n" 'Building the kernel...'
+    yes '' | make "-j$(nproc --all)" KCONFIG_CONFIG='Microsoft/config-wsl'
+
+    # Check for vmlinux file and move it to $PWD
+    find_vmlinux="$(find $PWD -type f -name 'vmlinux' | head -n1)"
+    if [ -f "$find_vmlinux" ]; then
+        mv "$find_vmlinux" "$script_dir/vmlinux"
+        printf "%s\n\n" 'Kernel build successful. vmlinux moved to the script directory.'
+        # Clean up build directory
+        rm -fr "$cwd"
+        printf "%s\n\n" 'Build directory cleaned up.'
+    else
+        printf "%s\n" 'Error: vmlinux file not found. Please check the build process.'
+        read -p "Do you want to delete the build directory? (y/n): " user_choice
+        if [ "$user_choice" = "y" ]; then
+            rm -fr "$cwd"
+            printf "%s\n\n" 'Build directory cleaned up.'
+        else
+            printf "%s\n\n" 'Build directory retained as per user choice.'
+        fi
+    fi
+}
+
+# Main script execution
+get_latest_release_version
+install_kernel
