@@ -34,4 +34,4 @@
   - Now, visit the below website for instructions on how to link the kernel to WSL2 
     - https://learn.microsoft.com/en-us/windows/wsl/wsl-config
 
-  - An example of the `.wslconfig` file is [.wslconfig script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig). You can use it to help understand the file formatting
+  - An example of the `.wslconfig` file is [.wslconfig script](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig). You can use it to help understand the file formatting.
