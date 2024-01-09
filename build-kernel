@@ -7,7 +7,7 @@
 ##
 ##  Purpose: Build Official WSL2 Kernels
 ##
-##  Updated: 01.07.24
+##  Updated: 01.09.24
 ##
 ##  Script version: 2.5
 ##
@@ -32,7 +32,7 @@ cd "$cwd" || exit 1
 # Set compiler optimizations
 CC='gcc'
 CXX='g++'
-CFLAGS='-g -O3 -pipe -march=native'
+CFLAGS='-g -O3 -march=native'
 CXXFLAGS="$CFLAGS"
 
 export CC CXX CFLAGS CXXFLAGS
@@ -45,8 +45,7 @@ is_aria2c_installed()
 
 get_latest_release_version()
 {
-    repo_url='https://github.com/microsoft/WSL2-Linux-Kernel'
-    latest_release_tag=$(curl -s "$repo_url/tags" | grep -oP 'href="/microsoft/WSL2-Linux-Kernel/releases/tag/\K[^"]+' | head -1)
+    latest_release_tag=$(curl -s 'https://github.com/microsoft/WSL2-Linux-Kernel/tags' | grep -oP 'href="/microsoft/WSL2-Linux-Kernel/releases/tag/\K[^"]+' | head -1)
     echo "$latest_release_tag"
 }
 
