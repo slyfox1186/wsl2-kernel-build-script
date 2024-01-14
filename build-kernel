@@ -80,7 +80,7 @@ download_file()
         aria2c -x 16 -s 16 -o "$output_file" "$url"
     elif command -v wget &> /dev/null; then
         echo 'Downloading with wget...'
-        wget -cqO "$output_file" "$url"
+        wget --cqO "$output_file" "$url"
     elif command -v curl &> /dev/null; then
         echo 'Downloading with curl...'
         curl -L "$url" -o "$output_file"
