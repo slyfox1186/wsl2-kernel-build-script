@@ -83,7 +83,7 @@ download_file()
         wget --show-progress --cqO "$output_file" "$url"
     elif command -v curl &> /dev/null; then
         echo 'Downloading with curl...'
-        curl -L "$url" -o "$output_file"
+        curl -Lso "$output_file" "$url"
     else
         echo 'No suitable download tool found. Please install aria2c, wget, or curl.'
         exit 1
