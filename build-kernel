@@ -31,8 +31,7 @@ CXXFLAGS="$CFLAGS"
 
 export CC CXX CFLAGS CXXFLAGS
 
-install_required_packages()
-{
+install_required_packages() {
     local missing_packages pkg packages
 
     pkgs=(
@@ -65,8 +64,7 @@ install_required_packages()
     fi
 }
 
-download_file()
-{
+download_file() {
     local url=$1
     local output_file=$2
 
@@ -90,8 +88,7 @@ download_file()
     fi
 }
 
-get_latest_release_version()
-{
+get_latest_release_version() {
     latest_release_tag=$(curl -s 'https://github.com/microsoft/WSL2-Linux-Kernel/tags' | grep -oP 'href="/microsoft/WSL2-Linux-Kernel/releases/tag/\K[^"]+' | head -1)
     echo "$latest_release_tag"
 }
@@ -108,8 +105,7 @@ build_kernel_without_progress() {
     return 0
 }
 
-install_kernel()
-{
+install_kernel() {
     clear
     printf "%s\n\n" "Successfully downloaded the source code file \"$latest_release_tag\""
     install_required_packages
