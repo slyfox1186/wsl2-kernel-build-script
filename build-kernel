@@ -3,8 +3,8 @@
 
 ##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
 ##  Purpose: Build Official WSL2 Kernels
-##  Updated: 01.13.24
-##  Script version: 2.6
+##  Updated: 03.12.24
+##  Script version: 2.8
 
 clear
 
@@ -16,8 +16,8 @@ fi
 # Define the program name, an output directory, and error log file
 program_name='wsl2-kernel'
 script_dir="$PWD"
-cwd="$script_dir/$program_name-build-script"
-error_log="$script_dir/error.log"
+cwd="/tmp/$program_name-build-script"
+error_log="/tmp/error.log"
 
 # Create and change to the build directory
 mkdir -p "$cwd"
@@ -73,24 +73,21 @@ download_file() {
         return 0
     fi
 
-    if command -v aria2c &> /dev/null; then
-        echo 'Downloading with aria2c...'
-        aria2c -x 16 -s 16 -o "$output_file" "$url"
-    elif command -v wget &> /dev/null; then
+    if command -v wget &> /dev/null; then
         echo 'Downloading with wget...'
-        wget --show-progress --cqO "$output_file" "$url"
-    elif command -v curl &> /dev/null; then
-        echo 'Downloading with curl...'
-        curl -Lso "$output_file" "$url"
+        wget --show-progress -cqO "$output_file" "$url"
     else
-        echo 'No suitable download tool found. Please install aria2c, wget, or curl.'
+        echo 'wget is not installed. Please install wget.'
         exit 1
     fi
 }
 
 get_latest_release_version() {
-    latest_release_tag=$(curl -s 'https://github.com/microsoft/WSL2-Linux-Kernel/tags' | grep -oP 'href="/microsoft/WSL2-Linux-Kernel/releases/tag/\K[^"]+' | head -1)
-    echo "$latest_release_tag"
+    local version_type=$1
+    local url="https://github.com/microsoft/WSL2-Linux-Kernel/tags/"
+    local pattern="linux-msft-wsl-$version_type\\.[0-9]+\\.[0-9]+\\.[0-9]+"
+
+    curl -s "$url" | grep -oP "$pattern" | head -1
 }
 
 # Function to build the kernel without a progress bar
@@ -99,7 +96,8 @@ build_kernel_without_progress() {
        'Installing the WSL2 Kernel' \
        '========================================='
     if ! echo 'yes' | make "-j$(nproc --all)" KCONFIG_CONFIG='Microsoft/config-wsl' 2>>"$error_log"; then
-        printf "%s\n" "Build process terminated with errors. Please check the error log at $error_log."
+        printf "%s\n" "Build process terminated with errors. Please check the error log below:"
+        cat "$error_log"
         return 1
     fi
     return 0
@@ -109,18 +107,23 @@ install_kernel() {
     clear
     printf "%s\n\n" "Successfully downloaded the source code file \"$latest_release_tag\""
     install_required_packages
-    version=$(get_latest_release_version)
+    version=$(get_latest_release_version "$version_type")
     if [ -z "$version" ]; then
         printf "%s\n\n" 'Failed to find the latest version. Exiting.'
         exit 1
     fi
 
-    tar_file="$program_name-$version.tar.gz"
+    tar_file="/tmp/$program_name-$version.tar.gz"
     download_url="https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz"
 
-    download_file "$download_url" "$tar_file"
+    # Check if the downloaded file already exists
+    if [ -f "$tar_file" ]; then
+        printf "%s\n\n" "Using the existing downloaded file: $tar_file"
+    else
+        download_file "$download_url" "$tar_file"
+    fi
 
-    extract_dir="$program_name-$version"
+    extract_dir="/tmp/$program_name-$version"
     [ -d "$extract_dir" ] && rm -rf "$extract_dir"
 
     mkdir -p "$extract_dir"
@@ -132,6 +135,9 @@ install_kernel() {
     cd "$extract_dir" || exit 1
     printf "%s\n\n" 'Building the kernel...'
     if ! build_kernel_without_progress; then
+        rm -rf "$extract_dir"
+        printf "%s\n" "Error log:"
+        cat "$error_log"
         return 1
     fi
 
@@ -155,13 +161,33 @@ install_kernel() {
 }
 
 # Main script execution
-get_latest_release_version
+while true; do
+    printf "%s\n" "Choose the WSL2 kernel version to download and install:"
+    printf "%s\n" "1. Linux series 6 kernel"
+    printf "%s\n" "2. Linux series 5 kernel"
+    printf "%s\n" "3. Exit"
+    read -p "Enter your choice (1-3): " choice
+
+    case $choice in
+        1)
+            version_type="6"
+            break
+            ;;
+        2)
+            version_type="5"
+            break
+            ;;
+        3)
+            printf "%s\n" "Exiting the script."
+            exit 0
+            ;;
+        *)
+            printf "%s\n" "Invalid choice. Please try again."
+            ;;
+    esac
+done
+
+get_latest_release_version "$version_type"
 if ! install_kernel; then
-    if [ -s "$error_log" ]; then
-        printf "%s\n" "Errors were encountered during the build process. Error log is available at $error_log."
-        read -p "Do you want to view the error log? (y/n): " view_choice
-        if [ "$view_choice" = "y" ]; then
-            cat "$error_log"
-        fi
-    fi
+    printf "%s\n" "Kernel build failed. Please check the error log above for more information."
 fi
