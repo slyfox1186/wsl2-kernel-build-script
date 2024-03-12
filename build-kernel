@@ -124,7 +124,7 @@ announce_options() {
 install_required_packages() {
     local missing_packages=""
     local pkgs=(
-        aria2 bc bison build-essential cmake curl debootstrap dwarves flex g++
+        bc bison build-essential cmake curl debootstrap dwarves flex g++
         g++-s390x-linux-gnu gcc gcc-s390x-linux-gnu gdb-multiarch git libcap-dev
         libelf-dev libncurses-dev libncurses5 libncursesw5 libncursesw5-dev
         libssl-dev make pkg-config python3 qemu-system-misc qemu-utils rsync wget
