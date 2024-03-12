@@ -4,7 +4,7 @@
 ##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
 ##  Purpose: Build Official WSL2 Kernels
 ##  Updated: 03.12.24
-##  Script version: 2.8
+##  Script version: 2.9
 
 show_help() {
     echo "Usage: $(basename "$0") [options]"
