@@ -94,7 +94,7 @@ else
 fi
 
 master_dir="/tmp/wsl2-build-script" # Master parent directory
-cwd="$master_dir/wsl2-kernel-build-script"
+cwd="$master_dir"
 error_log="$master_dir/error.log"
 
 # Create the master parent directory and the build directory within it
@@ -207,12 +207,12 @@ install_kernel() {
     echo "Successfully downloaded the source code file \"$version\""
     echo
 
-    tar_file="$master_dir/$program_name-$version.tar.gz"
+    tar_file="$master_dir/$version.tar.gz"
     download_url="https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz"
 
     download_file "$download_url" "$tar_file"
 
-    extract_dir="$master_dir/$program_name-$version"
+    extract_dir="$master_dir/$version"
     [ -d "$extract_dir" ] && rm -rf "$extract_dir"
 
     mkdir -p "$extract_dir"
