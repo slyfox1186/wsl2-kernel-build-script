@@ -7,7 +7,7 @@
 ##  Script version: 2.9
 
 show_help() {
-    echo "Usage: $(basename "$0") [options]"
+    echo "Usage: $(basename "$0") [[options]]"
     echo "Options:"
     echo "  -h, --help                  Show this help message."
     echo "  -v, --version VERSION       Set a custom version number of the WSL2 kernel to install."
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ "$EUID" -ne 0 ]; then
+if [[ "$EUID" -ne 0 ]]; then
     echo "You must run this script with root/sudo."
     exit 1
 fi
@@ -86,7 +86,7 @@ if ! $version_specified; then
 fi
 
 # Ensure the directory for 'vmlinux' is prepared.
-if [ -z "$output_directory" ]; then
+if [[ -z "$output_directory" ]]; then
     script_dir="$PWD" # Use current directory if no output directory is specified
 else
     script_dir="$output_directory"
@@ -130,13 +130,13 @@ install_required_packages() {
         libssl-dev make pkg-config python3 qemu-system-misc qemu-utils rsync wget
     )
 
-    for pkg in "${pkgs[@]}"; do
+    for pkg in "${pkgs[[@]]}"; do
         if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "ok installed"; then
             missing_packages+="$pkg "
         fi
     done
 
-    if [ -n "$missing_packages" ]; then
+    if [[ -n "$missing_packages" ]]; then
         echo
         echo "Installing missing packages: $missing_packages"
         echo
@@ -152,7 +152,7 @@ download_file() {
     local url=$1
     local output_file=$2
 
-    if [ -s "$output_file" ]; then
+    if [[ -s "$output_file" ]]; then
         echo "File $output_file already exists and is not empty. Skipping download."
         return 0
     fi
@@ -169,7 +169,7 @@ download_file() {
 get_latest_release_version() {
     local version_type=$1
     local url="https://github.com/microsoft/WSL2-Linux-Kernel/tags/"
-    local pattern="linux-msft-wsl-$version_type\\.[0-9]+\\.[0-9]+\\.[0-9]+"
+    local pattern="linux-msft-wsl-$version_type\\.[[0-9]]+\\.[[0-9]]+\\.[[0-9]]+"
 
     curl -s "$url" | grep -oP "$pattern" | head -1
 }
@@ -190,7 +190,7 @@ install_kernel() {
     announce_options
     install_required_packages
 
-    if [ -n "$specific_version" ]; then
+    if [[ -n "$specific_version" ]]; then
         version="$specific_version"
     else
         version=$(get_latest_release_version "$version_type")
@@ -198,7 +198,7 @@ install_kernel() {
 
     echo "Downloading kernel version $specific_version..."
 
-    if [ -z "$version" ]; then
+    if [[ -z "$version" ]]; then
         echo "Failed to find the latest version. Exiting."
         echo
         exit 1
@@ -213,7 +213,7 @@ install_kernel() {
     download_file "$download_url" "$tar_file"
 
     extract_dir="$master_dir/$version"
-    [ -d "$extract_dir" ] && rm -rf "$extract_dir"
+    [[ -d "$extract_dir" ]] && rm -rf "$extract_dir"
 
     mkdir -p "$extract_dir"
     if ! tar -zxf "$tar_file" -C "$extract_dir" --strip-components 1; then
@@ -236,13 +236,13 @@ install_kernel() {
         return 1
     else
         find_vmlinux="$(find $PWD -type f -name 'vmlinux' | head -n1)"
-        if [ -f "$find_vmlinux" ]; then
+        if [[ -f "$find_vmlinux" ]]; then
             mv "$find_vmlinux" "$script_dir/vmlinux"
             echo "Kernel build successful. vmlinux moved to the specified output directory: $script_dir"
             echo
 
             read -p "Do you want to delete the build directory? (y/n): " user_choice
-            if [ "$user_choice" = "y" ]; then
+            if [[ "$user_choice" = "y" ]]; then
                 rm -fr "$master_dir"
                 echo "Build directory cleaned up."
                 echo
