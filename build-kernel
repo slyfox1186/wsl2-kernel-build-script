@@ -195,7 +195,7 @@ install_kernel() {
 
     download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz" "$parent/$version.tar.gz"
 
-    echo -e "Successfully downloaded the source code file \"$version\"\\n"
+    echo -e "Successfully downloaded the source code file \"$version.tar.gz\"\\n"
 
     # Remove any leftover files from previous runs
     [[ -d "$working" ]] && rm -fr "$working"
