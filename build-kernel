@@ -132,7 +132,7 @@ install_required_packages() {
 
     if [[ -n "$missing_packages" ]]; then
         echo -e "\\nInstalling missing packages: $missing_packages\\n"
-        sudo apt-get install -y $missing_packages
+        sudo apt-get install $missing_packages
     else
         echo -e "\\nAll APT packages are already installed.\\n"
     fi
