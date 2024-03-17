@@ -132,7 +132,7 @@ install_required_packages() {
 
     if [[ -n "$missing_packages" ]]; then
         echo -e "\\nInstalling missing packages: $missing_packages\\n"
-        sudo apt-get install $missing_packages
+        sudo apt-get install -y $missing_packages
     else
         echo -e "\\nAll APT packages are already installed.\\n"
     fi
@@ -171,6 +171,10 @@ build_kernel_without_progress() {
         cat "$error_log"
         return 1
     fi
+    if ! make modules_install headers_install; then
+        echo "Failed to make modules and install headers"
+        exit 1
+    fi
     return 0
 }
 
@@ -195,7 +199,7 @@ install_kernel() {
 
     download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz" "$parent/$version.tar.gz"
 
-    echo -e "Successfully downloaded the source code file \"$version.tar.gz\"\\n"
+    echo -e "Successfully downloaded the source code file \"$version\"\\n"
 
     # Remove any leftover files from previous runs
     [[ -d "$working" ]] && rm -fr "$working"
@@ -223,7 +227,7 @@ install_kernel() {
     else
         locate_vmlinux=$(find $PWD -type f -name vmlinux | head -n1)
         if [[ -f "$locate_vmlinux" ]]; then
-            mv "$locate_vmlinux" "$script_dir/vmlinux"
+            cp -f "$locate_vmlinux" "$script_dir/vmlinux"
             echo -e "\\nKernel build successful. vmlinux moved to the specified output directory: $script_dir\\n"
 
             local choic
