@@ -3,47 +3,44 @@
 
 ##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
 ##  Purpose: Build Official WSL2 Kernels
-##  Updated: 03.12.24
-##  Script version: 2.9
+##  Updated: 03.17.2024
+##  Script version: 3.0
 
 show_help() {
-    echo "Usage: $(basename "$0") [[options]]"
+    echo "Usage: $(basename "$0") [options]"
     echo "Options:"
-    echo "  -h, --help                  Show this help message."
-    echo "  -v, --version VERSION       Set a custom version number of the WSL2 kernel to install."
-    echo "  -o, --output-directory DIRECTORY  Specify where the vmlinux file should be placed after build."
+    echo "  -h, --help                            Show this help message."
+    echo "  -v, --version VERSION                 Set a custom version number of the WSL2 kernel to install."
+    echo "  -o, --output-directory <DIRECTORY>    Specify where the vmlinux file should be placed after build."
 }
 
-version_specified=false
-specific_version=""
 output_directory=""
+kernel_version=""
 version_type=""
+version_specified="false"
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         -h|--help)
             show_help
             exit 0
             ;;
         -v|--version)
-            version_specified=true
-            specific_version="linux-msft-wsl-$2"
-            shift # past argument
-            shift # past value
+            version_specified="true"
+            kernel_version="linux-msft-wsl-$2"
+            shift 2
             ;;
         -o|--output-directory)
-            output_directory=$2
-            shift # past argument
-            shift # past value
+            output_directory="$2"
+            shift 2
             ;;
-        *)
-            shift # past argument
+        *)  shift
             ;;
     esac
 done
 
 if [[ "$EUID" -ne 0 ]]; then
-    echo "You must run this script with root/sudo."
+    echo "You must run this script with root or sudo."
     exit 1
 fi
 
@@ -59,7 +56,7 @@ if ! $version_specified; then
         echo
         read -p "Enter your choice (1-4): " choice
 
-        case $choice in
+        case "$choice" in
             1)
                 version_type="6"
                 break
@@ -69,8 +66,8 @@ if ! $version_specified; then
                 break
                 ;;
             3)
-                read -p "Enter the version numbers (e.g., 5.15.90.1): " user_input
-                specific_version="linux-msft-wsl-$user_input"
+                read -p "Enter the version numbers (e.g., 5.15.90.1): " choice
+                kernel_version="linux-msft-wsl-$choice"
                 version_specified=true
                 break
                 ;;
@@ -78,9 +75,7 @@ if ! $version_specified; then
                 echo "Exiting the script."
                 exit 0
                 ;;
-            *)
-                echo "Invalid choice. Please try again."
-                ;;
+            *)  echo "Invalid choice. Please try again." ;;
         esac
     done
 fi
@@ -93,20 +88,19 @@ else
     mkdir -p "$script_dir" # Create output directory if it does not exist
 fi
 
-master_dir="/tmp/wsl2-build-script" # Master parent directory
-cwd="$master_dir"
-error_log="$master_dir/error.log"
+parent="/tmp/wsl2-build-script" # parent parent directory
+working="$parent/working"
+error_log="$parent/error.log"
 
-# Create the master parent directory and the build directory within it
-mkdir -p "$cwd"
-cd "$cwd" || exit 1
+# Create the parent parent directory and the build directory within it
+mkdir -p "$parent"
+cd "$parent" || exit 1
 
 # Set compiler optimizations
 CC="gcc"
 CXX="g++"
-CFLAGS="-g -O3 -march=native"
-CXXFLAGS="$CFLAGS"
-
+CFLAGS="-g -O3 -pipe -march=native"
+CXXFLAGS="-g -O3 -pipe -march=native"
 export CC CXX CFLAGS CXXFLAGS
 
 announce_options() {
@@ -114,7 +108,7 @@ announce_options() {
     echo "Final script configuration:"
     echo "Specific version specified: $version_specified"
     if $version_specified; then
-        echo "Specific version: $specific_version"
+        echo "Specific version: $kernel_version"
     else
         echo "Version: Using the latest available version"
     fi
@@ -130,55 +124,50 @@ install_required_packages() {
         libssl-dev make pkg-config python3 qemu-system-misc qemu-utils rsync wget
     )
 
-    for pkg in "${pkgs[[@]]}"; do
-        if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "ok installed"; then
+    for pkg in "${pkgs[@]}"; do
+        if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -qo "ok installed"; then
             missing_packages+="$pkg "
         fi
     done
 
     if [[ -n "$missing_packages" ]]; then
-        echo
-        echo "Installing missing packages: $missing_packages"
-        echo
-        sudo apt-get -y install $missing_packages
+        echo -e "\\nInstalling missing packages: $missing_packages\\n"
+        sudo apt-get install -y $missing_packages
     else
-        echo
-        echo "All APT packages are already installed."
-        echo
+        echo -e "\\nAll APT packages are already installed.\\n"
     fi
 }
 
 download_file() {
-    local url=$1
-    local output_file=$2
+    local url="$1"
+    local output_file="$2"
 
     if [[ -s "$output_file" ]]; then
         echo "File $output_file already exists and is not empty. Skipping download."
         return 0
     fi
 
-    if command -v wget &> /dev/null; then
-        echo "Downloading with wget..."
-        wget --show-progress -cqO "$output_file" "$url"
-    else
+    if ! command -v wget &>/dev/null; then
         echo "wget is not installed. Please install wget."
         exit 1
     fi
+    echo -e "Downloading with wget...\\n"
+    wget --show-progress -cqO "$output_file" "$url"
 }
 
-get_latest_release_version() {
-    local version_type=$1
+source_the_latest_release_version() {
+    local version_type="$1"
     local url="https://github.com/microsoft/WSL2-Linux-Kernel/tags/"
-    local pattern="linux-msft-wsl-$version_type\\.[[0-9]]+\\.[[0-9]]+\\.[[0-9]]+"
+    local pattern="linux-msft-wsl-$version_type\\.[0-9]+\\.[0-9]+\\.[0-9]+"
 
-    curl -s "$url" | grep -oP "$pattern" | head -1
+    curl -fsS "$url" | grep -oP "$pattern" | head -n1
 }
 
 build_kernel_without_progress() {
     echo "Installing the WSL2 Kernel"
     echo "========================================="
     if ! echo "yes" | make "-j$(nproc --all)" KCONFIG_CONFIG="Microsoft/config-wsl" 2>>"$error_log"; then
-        echo "Build process terminated with errors. Please check the error log below:"
+        echo -e "\\nBuild process terminated with errors. Please check the error log below:\\n"
         cat "$error_log"
         return 1
     fi
@@ -190,13 +179,13 @@ install_kernel() {
     announce_options
     install_required_packages
 
-    if [[ -n "$specific_version" ]]; then
-        version="$specific_version"
+    if [[ -n "$kernel_version" ]]; then
+        version="$kernel_version"
     else
-        version=$(get_latest_release_version "$version_type")
+        version=$(source_the_latest_release_version "$version_type")
     fi
 
-    echo "Downloading kernel version $specific_version..."
+    echo "Downloading kernel version $version..."
 
     if [[ -z "$version" ]]; then
         echo "Failed to find the latest version. Exiting."
@@ -204,51 +193,46 @@ install_kernel() {
         exit 1
     fi
 
-    echo "Successfully downloaded the source code file \"$version\""
-    echo
+    download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz" "$parent/$version.tar.gz"
 
-    tar_file="$master_dir/$version.tar.gz"
-    download_url="https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz"
+    echo -e "Successfully downloaded the source code file \"$version\"\\n"
 
-    download_file "$download_url" "$tar_file"
+    # Remove any leftover files from previous runs
+    [[ -d "$working" ]] && rm -fr "$working"
 
-    extract_dir="$master_dir/$version"
-    [[ -d "$extract_dir" ]] && rm -rf "$extract_dir"
+    # Ge the working directory ready
+    mkdir -p "$working"
 
-    mkdir -p "$extract_dir"
-    if ! tar -zxf "$tar_file" -C "$extract_dir" --strip-components 1; then
+    if ! tar -zxf "$parent/$version.tar.gz" -C "$working" --strip-components 1; then
         echo "Failed to extract the archive. Deleting the corrupt archive."
-        rm -f "$tar_file"
+        rm -f "$parent/$version.tar.gz"
         echo
         echo "The archive file has been deleted due to extraction failure."
         echo "Please run the script again to fix the issue."
         exit 1
     fi
 
-    cd "$extract_dir" || exit 1
-    echo "Building the kernel..."
-    echo
+    cd "$working" || exit 1
+    echo -e "\\nBuilding the kernel...\\n"
     if ! build_kernel_without_progress; then
-        rm -rf "$extract_dir"
+        rm -fr "$working"
         echo "Error log:"
         cat "$error_log"
-        echo "Kernel build failed. Please check the error log above for more information."
+        echo -e "\\nKernel build failed. Please check the error log above for more information.\\n"
         return 1
     else
-        find_vmlinux="$(find $PWD -type f -name 'vmlinux' | head -n1)"
-        if [[ -f "$find_vmlinux" ]]; then
-            mv "$find_vmlinux" "$script_dir/vmlinux"
-            echo "Kernel build successful. vmlinux moved to the specified output directory: $script_dir"
-            echo
+        locate_vmlinux=$(find $PWD -type f -name vmlinux | head -n1)
+        if [[ -f "$locate_vmlinux" ]]; then
+            mv "$locate_vmlinux" "$script_dir/vmlinux"
+            echo -e "\\nKernel build successful. vmlinux moved to the specified output directory: $script_dir\\n"
 
-            read -p "Do you want to delete the build directory? (y/n): " user_choice
-            if [[ "$user_choice" = "y" ]]; then
-                rm -fr "$master_dir"
-                echo "Build directory cleaned up."
-                echo
+            local choic
+            read -p "Do you want to delete the build directory? (y/n): " choice
+            if [[ "$choice" = "y" ]]; then
+                rm -fr "$working"
+                echo -e "\\nBuild directory cleaned up.\\n"
             else
-                echo "Build directory retained as per user choice."
-                echo
+                echo -e "\\nBuild directory retained as per user choice.\\n"
             fi
         else
             echo "Error: vmlinux file not found. Please check the build process."
