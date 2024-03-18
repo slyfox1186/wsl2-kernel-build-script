@@ -88,6 +88,7 @@ else
     mkdir -p "$script_dir" # Create output directory if it does not exist
 fi
 
+cwd="$PWD"
 parent="/tmp/wsl2-build-script" # parent parent directory
 working="$parent/working"
 error_log="$parent/error.log"
@@ -113,6 +114,31 @@ announce_options() {
         echo "Version: Using the latest available version"
     fi
     echo "Output directory: ${output_directory:-"Default directory ($PWD)"}"
+}
+
+prompt_wsl_script() {
+    echo
+    echo "Do you want to run the automatic file generator for .wslconfig?"
+    echo
+    read -p "Please enter a your choice (yes/no): " choice
+    echo
+
+    case "$choice" in
+        y|yes) bash <(curl -fsSL "https://raw.githubusercontent.com/slyfox1186/wsl2-kernel-build-script/main/wslconfig-generator.sh") ;;
+        n|no)  ;;
+        *)     echo "Bad user input..."
+               unset choice
+               prompt_wsl_script
+               ;;
+    esac
+
+    if [[ -f ".wslconfig" ]]; then
+        echo "The .wslconfig file was generated successfully."
+        return 0
+    else
+        echo "Failed to generate the .wslconfig file... exiting script."
+        return 1
+    fi
 }
 
 install_required_packages() {
@@ -245,4 +271,17 @@ install_kernel() {
     fi
 }
 
+# Run the kenerl building code
 install_kernel
+if [[ -f "$cwd/vmlinux" ]]; then
+    echo "The file \"vmlinux\" can be found in this script's directory."
+else
+    echo "Failed to move the files \"vmlinux\" to the script's directory."
+    exit 1
+fi
+
+# Prompt and run the .wslconfig generator script
+prompt_wsl_script
+if [[ -f "$cwd/.wslconfig" ]]; then
+    echo "The file \".wslconfig\" can be found in this script's directory."
+fi
