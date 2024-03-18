@@ -5,7 +5,7 @@ memory=32GB
 # Sets the VM virtual processors count
 processors=32
 # Sets amount of swap storage space to 16GB, default is 25% of available RAM
-swap=16
+swap=16GB
 # Sets swapfile path location, default is %LocalAppData%\\temp\\swap.vhdx
 swapFile=C:\\Users\\jholl\\AppData\\Local\\Temp\\swap.vhdx
 # Boolean to turn on or off support for GUI applications (WSLg) in WSL. Only available for Windows 11
