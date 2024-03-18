@@ -276,7 +276,7 @@ install_kernel
 if [[ -f "$cwd/vmlinux" ]]; then
     echo "The file \"vmlinux\" can be found in this script's directory."
 else
-    echo "Failed to move the files \"vmlinux\" to the script's directory."
+    echo "Failed to move the file \"vmlinux\" to the script's directory."
     exit 1
 fi
 
