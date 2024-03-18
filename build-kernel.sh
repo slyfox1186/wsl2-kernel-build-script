@@ -125,20 +125,12 @@ prompt_wsl_script() {
 
     case "$choice" in
         y|yes) bash <(curl -fsSL "https://raw.githubusercontent.com/slyfox1186/wsl2-kernel-build-script/main/wslconfig-generator.sh") ;;
-        n|no)  ;;
+        n|no)  exit 0 ;;
         *)     echo "Bad user input..."
                unset choice
                prompt_wsl_script
                ;;
     esac
-
-    if [[ -f ".wslconfig" ]]; then
-        echo "The .wslconfig file was generated successfully."
-        return 0
-    else
-        echo "Failed to generate the .wslconfig file... exiting script."
-        return 1
-    fi
 }
 
 install_required_packages() {
@@ -281,7 +273,10 @@ else
 fi
 
 # Prompt and run the .wslconfig generator script
+cd "$cwd" || exit 1
 prompt_wsl_script
-if [[ -f "$cwd/.wslconfig" ]]; then
-    echo "The file \".wslconfig\" can be found in this script's directory."
+if [[ -f ".wslconfig" ]]; then
+    echo "The \".wslconfig\" file can be found in this script's directory."
+else
+    echo "The \".wslconfig\" file failed to generate."
 fi
