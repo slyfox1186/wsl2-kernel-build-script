@@ -1,5 +1,4 @@
 [wsl2]
-# Set the path to the custom kernel
 kernel=C:\\Users\\jholl\\WSL2\\vmlinux
 # Limits VM memory to use no more than 4 GB, this can be set as whole numbers using GB or MB
 memory=32GB
@@ -16,4 +15,12 @@ debugConsole=false
 # Enables nested virtualization
 nestedVirtualization=true
 # The number of milliseconds that a VM is idle, before it is shut down. Only available for Windows 11
-vmIdleTimeout=60000
+vmIdleTimeout=3600000
+# Enable experimental features
+[experimental]
+autoMemoryReclaim=gradual
+networkingMode=NAT
+dnsTunneling=true
+firewall=true
+sparseVhd=true
+autoProxy=true
