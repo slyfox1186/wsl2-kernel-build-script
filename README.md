@@ -25,14 +25,14 @@ There are two methods to download and run the build script:
   - Download and execute the script in one step:
     ```sh
     curl -Lso build-kernel.sh https://wsl.optimizethis.net
-    bash build-kernel.sh
+    sudo bash build-kernel.sh
     ```
   
   - Clone the repository and execute the build script:
     ```sh
     git clone https://github.com/slyfox1186/wsl2-kernel-build-script.git
     cd wsl2-kernel-build-script
-    bash build-kernel.sh
+    sudo bash build-kernel.sh
     ```
 
 - **Download Link for the Script:**
