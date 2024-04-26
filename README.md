@@ -8,14 +8,6 @@ This document details the process of building the latest Microsoft WSL2 (Windows
 
 - To compile and integrate the latest Microsoft WSL2 kernel release with your current Linux distributions on WSL2.
 
-### Supported Distributions
-
-- Debian / Ubuntu
-
-#### Supported Architecture
-
-- x86_64
-
 ### Installation Instructions
 
 There are two methods to download and run the build script:
