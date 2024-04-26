@@ -207,7 +207,7 @@ fi
 
 # Get number of processors
 if [[ -z "$num_processors" ]]; then
-  num_processors=$(nproc)
+  num_processors=$(nproc --all)
 fi
 
 # Calculate the swap size as 25% of the total memory if not provided by the user
@@ -221,7 +221,8 @@ vm_idle_timeout_ms=$((vm_idle_timeout * 1000))
 # Create the .wslconfig file with filled in values
 cat > .wslconfig <<EOL
 [wsl2]
-kernel=${kernel_path}
+# Specify a custom Linux kernel to use with your installed distros. The default kernel used can be found at https://github.com/microsoft/WSL2-Linux-Kernel
+kernel=${kernel_path:-C:\\\\path\\\\to\\\\vmlinux}
 # Limits VM memory to use no more than 4 GB, this can be set as whole numbers using GB or MB
 # Total memory: ${total_memory_gb}GB
 # Setting memory to: ${memory_value}GB
@@ -231,7 +232,7 @@ processors=${num_processors}
 # Sets amount of swap storage space, default is 25% of available RAM
 swap=${swap_size}GB
 # Sets swapfile path location, default is %LocalAppData%\\temp\\swap.vhdx
-swapFile=${swapfile_path}
+# swapFile=${swapfile_path:-C:\\\\path\\\\to\\\\swap\\\\file\\\\swap.vhdx}
 # Boolean to turn on or off support for GUI applications (WSLg) in WSL. Only available for Windows 11
 guiApplications=${gui_applications}
 # Turns on or off output console showing contents of dmesg when opening a WSL 2 distro for debugging
