@@ -3,8 +3,8 @@
 
 ##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
 ##  Purpose: Build Official WSL2 Kernels
-##  Updated: 04.26.2024
-##  Script version: 3.1
+##  Updated: 03.17.2024
+##  Script version: 3.0
 
 show_help() {
     echo "Usage: $(basename "$0") [options]"
@@ -119,8 +119,8 @@ mkdir -p "$parent"
 cd "$parent" || exit 1
 
 # Set compiler optimizations
-CC="gcc"
-CXX="g++"
+CC="ccache gcc"
+CXX="ccache g++"
 CFLAGS="-g -O3 -pipe -march=native"
 CXXFLAGS="-g -O3 -pipe -march=native"
 export CC CXX CFLAGS CXXFLAGS
@@ -157,7 +157,7 @@ prompt_wsl_script() {
 install_required_packages() {
     local missing_packages=""
     local pkgs=(
-        bc bison build-essential cmake curl debootstrap dwarves flex g++
+        bc bison build-essential ccache cmake curl debootstrap dwarves flex g++
         g++-s390x-linux-gnu gcc gcc-s390x-linux-gnu gdb-multiarch git libcap-dev
         libelf-dev libncurses-dev libncurses5 libncursesw5 libncursesw5-dev
         libssl-dev make pkg-config python3 qemu-system-misc qemu-utils rsync wget
@@ -264,7 +264,7 @@ install_kernel() {
         echo -e "\\nKernel build failed. Please check the error log above for more information.\\n"
         return 1
     else
-        locate_vmlinux=$(find $PWD -type f -name vmlinux | head -n1)
+        locate_vmlinux=$(find "$PWD" -type f -name vmlinux | head -n1)
         if [[ -f "$locate_vmlinux" ]]; then
             cp -f "$locate_vmlinux" "$script_dir/vmlinux"
             echo -e "\\nKernel build successful. vmlinux moved to the specified output directory: $script_dir\\n"
