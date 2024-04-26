@@ -3,8 +3,8 @@
 
 ##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
 ##  Purpose: Build Official WSL2 Kernels
-##  Updated: 03.17.2024
-##  Script version: 3.0
+##  Updated: 04.26.2024
+##  Script version: 3.1
 
 show_help() {
     echo "Usage: $(basename "$0") [options]"
@@ -44,17 +44,35 @@ if [[ "$EUID" -ne 0 ]]; then
     exit 1
 fi
 
+list_available_versions() {
+    clear
+    echo "Available kernel versions:"
+    echo
+    url="https://github.com/microsoft/WSL2-Linux-Kernel/tags/"
+    pattern="linux-msft-wsl-([56]\\.[0-9]+\\.[0-9]+\\.[0-9]+)"
+
+    versions=$(curl -fsS "$url" | grep -oP "$pattern" | sed 's/linux-msft-wsl-//g' | uniq | sort -V)
+
+    if [[ -n "$versions" ]]; then
+        echo "$versions"
+    else
+        echo "No versions found."
+    fi
+}
+
 # Prompting the user for input if no version specified
 if ! $version_specified; then
     while true; do
+        echo
         echo "Choose the WSL2 kernel version to download and install:"
         echo
         echo "1. Linux series 6 kernel"
         echo "2. Linux series 5 kernel"
         echo "3. Specific version"
-        echo "4. Exit"
+        echo "4. List available versions"
+        echo "5. Exit"
         echo
-        read -p "Enter your choice (1-4): " choice
+        read -p "Enter your choice (1-5): " choice
 
         case "$choice" in
             1)
@@ -72,6 +90,9 @@ if ! $version_specified; then
                 break
                 ;;
             4)
+                list_available_versions
+                ;;
+            5)
                 echo "Exiting the script."
                 exit 0
                 ;;
@@ -263,7 +284,7 @@ install_kernel() {
     fi
 }
 
-# Run the kenerl building code
+# Run the kernel building code
 install_kernel
 if [[ -f "$cwd/vmlinux" ]]; then
     echo "The file \"vmlinux\" can be found in this script's directory."
