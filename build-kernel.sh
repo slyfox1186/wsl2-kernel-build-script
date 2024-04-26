@@ -276,7 +276,9 @@ fi
 cd "$cwd" || exit 1
 prompt_wsl_script
 if [[ -f ".wslconfig" ]]; then
+    echo
     echo "The \".wslconfig\" file can be found in this script's directory."
 else
+    echo
     echo "The \".wslconfig\" file failed to generate."
 fi
