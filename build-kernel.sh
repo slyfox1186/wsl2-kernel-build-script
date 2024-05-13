@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2162,SC2317
 
-##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel
-##  Purpose: Build Official WSL2 Kernels
-##  Updated: 03.17.2024
-##  Script version: 3.0
+# Color variables
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
 
 show_help() {
     echo "Usage: $(basename "$0") [options]"
@@ -14,11 +15,25 @@ show_help() {
     echo "  -o, --output-directory <DIRECTORY>    Specify where the vmlinux file should be placed after build."
 }
 
+log() {
+    echo -e "${GREEN}[INFO]${NC} $*"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARNING]${NC} $*"
+}
+
+fail() {
+    echo -e "${RED}[ERROR]${NC} $*" >&2
+    exit 1
+}
+
 output_directory=""
 kernel_version=""
 version_type=""
 version_specified="false"
 
+# Parse command line options
 while [ "$#" -gt 0 ]; do
     case "$1" in
         -h|--help)
@@ -27,36 +42,36 @@ while [ "$#" -gt 0 ]; do
             ;;
         -v|--version)
             version_specified="true"
-            kernel_version="linux-msft-wsl-$2"
+            kernel_version="$2"
             shift 2
             ;;
         -o|--output-directory)
             output_directory="$2"
             shift 2
             ;;
-        *)  shift
+        *)
+            fail "Invalid option: $1"
             ;;
     esac
 done
 
+# Check if the script is run with root privileges
 if [[ "$EUID" -ne 0 ]]; then
-    echo "You must run this script with root or sudo."
-    exit 1
+    fail "You must run this script with root or sudo."
 fi
 
 list_available_versions() {
-    clear
-    echo "Available kernel versions:"
+    local version
+
     echo
-    url="https://github.com/microsoft/WSL2-Linux-Kernel/tags/"
-    pattern="linux-msft-wsl-([56]\\.[0-9]+\\.[0-9]+\\.[0-9]+)"
+    log "Available kernel versions:"
+    echo
+    version=$(curl -fsS "https://github.com/microsoft/WSL2-Linux-Kernel/tags/" | grep -oP 'linux-msft-wsl-\K\d+([\d.])+(?=\.tar\.[a-z]+)' | sort -ruV)
 
-    versions=$(curl -fsS "$url" | grep -oP "$pattern" | sed 's/linux-msft-wsl-//g' | uniq | sort -V)
-
-    if [[ -n "$versions" ]]; then
-        echo "$versions"
+    if [[ -n "$version" ]]; then
+        echo "$version"
     else
-        echo "No versions found."
+        echo "No version found."
     fi
 }
 
@@ -72,7 +87,7 @@ if ! $version_specified; then
         echo "4. List available versions"
         echo "5. Exit"
         echo
-        read -p "Enter your choice (1-5): " choice
+        read -rp "Enter your choice (1-5): " choice
 
         case "$choice" in
             1)
@@ -84,8 +99,8 @@ if ! $version_specified; then
                 break
                 ;;
             3)
-                read -p "Enter the version numbers (e.g., 5.15.90.1): " choice
-                kernel_version="linux-msft-wsl-$choice"
+                read -rp "Enter the version numbers (e.g., 5.15.90.1): " choice
+                kernel_version="$choice"
                 version_specified=true
                 break
                 ;;
@@ -96,7 +111,9 @@ if ! $version_specified; then
                 echo "Exiting the script."
                 exit 0
                 ;;
-            *)  echo "Invalid choice. Please try again." ;;
+            *)
+                fail "Invalid choice. Please try again."
+                ;;
         esac
     done
 fi
@@ -109,54 +126,51 @@ else
     mkdir -p "$script_dir" # Create output directory if it does not exist
 fi
 
-cwd="$PWD"
-parent="/tmp/wsl2-build-script" # parent parent directory
-working="$parent/working"
-error_log="$parent/error.log"
-
-# Create the parent parent directory and the build directory within it
-mkdir -p "$parent"
-cd "$parent" || exit 1
-
 # Set compiler optimizations
-CC="ccache gcc"
-CXX="ccache g++"
-CFLAGS="-g -O3 -pipe -march=native"
-CXXFLAGS="-g -O3 -pipe -march=native"
-export CC CXX CFLAGS CXXFLAGS
+export CC="ccache gcc"
+export CXX="ccache g++"
+export CFLAGS="-O2 -pipe -march=native" # Aggressive optimization flags
+export CXXFLAGS="$CFLAGS" # Aggressive optimization flags
 
 announce_options() {
     # Announce options after all inputs have been processed
+    echo
     echo "Final script configuration:"
-    echo "Specific version specified: $version_specified"
+    echo "==================================="
+    log "Specific version specified: $version_specified"
     if $version_specified; then
-        echo "Specific version: $kernel_version"
+        log "Specific version: $kernel_version"
     else
-        echo "Version: Using the latest available version"
+        log "Version: Using the latest available version"
     fi
-    echo "Output directory: ${output_directory:-"Default directory ($PWD)"}"
+    log "Output directory: ${output_directory:-"Default directory ($PWD)"}"
 }
 
 prompt_wsl_script() {
-    echo
-    echo "Do you want to run the automatic file generator for .wslconfig?"
-    echo
-    read -p "Please enter a your choice (yes/no): " choice
+    log "Do you want to run the automatic file generator for .wslconfig?"
+    read -rp "Please enter your choice (y/n): " choice
     echo
 
     case "$choice" in
-        y|yes) bash <(curl -fsSL "https://raw.githubusercontent.com/slyfox1186/wsl2-kernel-build-script/main/wslconfig-generator.sh") ;;
-        n|no)  exit 0 ;;
-        *)     echo "Bad user input..."
-               unset choice
-               prompt_wsl_script
-               ;;
+        [yY]*)
+            bash <(curl -fsSL "https://raw.githubusercontent.com/slyfox1186/wsl2-kernel-build-script/main/wslconfig-generator.sh")
+            ;;
+        [nN]*)
+            exit 0
+            ;;
+        *)
+           warn "Bad user input..."
+           unset choice
+           prompt_wsl_script
+           ;;
     esac
 }
 
 install_required_packages() {
-    local missing_packages=""
-    local pkgs=(
+    local -a pkgs
+    local missing_packages
+    missing_packages=""
+    pkgs=(
         bc bison build-essential ccache cmake curl debootstrap dwarves flex g++
         g++-s390x-linux-gnu gcc gcc-s390x-linux-gnu gdb-multiarch git libcap-dev
         libelf-dev libncurses-dev libncurses5 libncursesw5 libncursesw5-dev
@@ -165,24 +179,25 @@ install_required_packages() {
 
     for pkg in "${pkgs[@]}"; do
         if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -qo "ok installed"; then
-            missing_packages+="$pkg "
+            missing_packages+=("$pkg")
         fi
     done
 
     if [[ -n "$missing_packages" ]]; then
-        echo -e "\\nInstalling missing packages: $missing_packages\\n"
+        log "Installing missing packages: $missing_packages"
         sudo apt-get install -y $missing_packages
     else
-        echo -e "\\nAll APT packages are already installed.\\n"
+        log "All APT packages are already installed."
     fi
 }
 
 download_file() {
-    local url="$1"
-    local output_file="$2"
+    local output_file url
+    url="$1"
+    output_file="$2"
 
     if [[ -s "$output_file" ]]; then
-        echo "File $output_file already exists and is not empty. Skipping download."
+        log "File $output_file already exists and is not empty. Skipping download."
         return 0
     fi
 
@@ -190,29 +205,29 @@ download_file() {
         echo "wget is not installed. Please install wget."
         exit 1
     fi
-    echo -e "Downloading with wget...\\n"
+    log "Downloading with wget..."
     wget --show-progress -cqO "$output_file" "$url"
 }
 
 source_the_latest_release_version() {
-    local version_type="$1"
-    local url="https://github.com/microsoft/WSL2-Linux-Kernel/tags/"
-    local pattern="linux-msft-wsl-$version_type\\.[0-9]+\\.[0-9]+\\.[0-9]+"
+    local version_type
+    version_type="$1"
 
-    curl -fsS "$url" | grep -oP "$pattern" | head -n1
+    curl -fsS "https://github.com/microsoft/WSL2-Linux-Kernel/tags/" | grep -oP "linux-msft-wsl-\K${version_type}\.([\d.])+(?=\.tar\.[a-z]+)" | head -n1
 }
 
 build_kernel_without_progress() {
+    echo
     echo "Installing the WSL2 Kernel"
     echo "========================================="
+    echo
     if ! echo "yes" | make "-j$(nproc --all)" KCONFIG_CONFIG="Microsoft/config-wsl" 2>>"$error_log"; then
-        echo -e "\\nBuild process terminated with errors. Please check the error log below:\\n"
+        log "Build process terminated with errors. Please check the error log below:"
         cat "$error_log"
         return 1
     fi
     if ! make modules_install headers_install; then
-        echo "Failed to make modules and install headers"
-        exit 1
+        fail "Failed to make modules and install headers"
     fi
     return 0
 }
@@ -228,78 +243,78 @@ install_kernel() {
         version=$(source_the_latest_release_version "$version_type")
     fi
 
-    echo "Downloading kernel version $version..."
+    log "Downloading kernel version $version..."
 
     if [[ -z "$version" ]]; then
-        echo "Failed to find the latest version. Exiting."
-        echo
-        exit 1
+        log "Failed to find the latest version. Exiting."
     fi
 
-    download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/$version.tar.gz" "$parent/$version.tar.gz"
+    download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-$version.tar.gz" "$parent/$version.tar.gz"
 
-    echo -e "Successfully downloaded the source code file \"$version\"\\n"
+    log "Successfully downloaded the source code file \"$version\""
 
     # Remove any leftover files from previous runs
     [[ -d "$working" ]] && rm -fr "$working"
 
-    # Ge the working directory ready
+    # Get the working directory ready
     mkdir -p "$working"
 
     if ! tar -zxf "$parent/$version.tar.gz" -C "$working" --strip-components 1; then
-        echo "Failed to extract the archive. Deleting the corrupt archive."
+        warn "Failed to extract the archive. Deleting the corrupt archive."
         rm -f "$parent/$version.tar.gz"
-        echo
-        echo "The archive file has been deleted due to extraction failure."
-        echo "Please run the script again to fix the issue."
+        log "The archive file has been deleted due to extraction failure. Please re-run the script."
         exit 1
     fi
 
     cd "$working" || exit 1
-    echo -e "\\nBuilding the kernel...\\n"
+    log "Building the kernel..."
     if ! build_kernel_without_progress; then
         rm -fr "$working"
-        echo "Error log:"
+        log "Error log:"
         cat "$error_log"
-        echo -e "\\nKernel build failed. Please check the error log above for more information.\\n"
-        return 1
+        fail "Kernel build failed. Please check the error log above for more information."
     else
         locate_vmlinux=$(find "$PWD" -type f -name vmlinux | head -n1)
         if [[ -f "$locate_vmlinux" ]]; then
             cp -f "$locate_vmlinux" "$script_dir/vmlinux"
-            echo -e "\\nKernel build successful. vmlinux moved to the specified output directory: $script_dir\\n"
+            log "Kernel build successful. vmlinux moved to the specified output directory: $script_dir"
 
-            local choic
-            read -p "Do you want to delete the build directory? (y/n): " choice
+            local choice
+            read -rp "Do you want to delete the build directory? (y/n): " choice
             if [[ "$choice" = "y" ]]; then
                 rm -fr "$working"
-                echo -e "\\nBuild directory cleaned up.\\n"
+                log "Build directory cleaned up."
             else
-                echo -e "\\nBuild directory retained as per user choice.\\n"
+                log "Build directory retained as per user choice."
             fi
         else
-            echo "Error: vmlinux file not found. Please check the build process."
-            return 1
+            fail "Error: vmlinux file not found. Please check the build process."
         fi
     fi
 }
 
 # Run the kernel building code
+cwd="$PWD"
+parent="/tmp/wsl2-build-script"
+working="$parent/working"
+error_log="$parent/error.log"
+
+# Create the parent parent directory and the build directory within it
+mkdir -p "$parent"
+cd "$parent" || exit 1
+
 install_kernel
 if [[ -f "$cwd/vmlinux" ]]; then
-    echo "The file \"vmlinux\" can be found in this script's directory."
+    log "The file \"vmlinux\" can be found in this script's directory."
 else
-    echo "Failed to move the file \"vmlinux\" to the script's directory."
-    exit 1
+    warn "Failed to move the file \"vmlinux\" to the script's directory."
 fi
 
 # Prompt and run the .wslconfig generator script
 cd "$cwd" || exit 1
 prompt_wsl_script
 if [[ -f ".wslconfig" ]]; then
-    echo
-    echo "The \".wslconfig\" file can be found in this script's directory."
+    log "The \".wslconfig\" file can be found in this script's directory."
 else
-    echo
-    echo "The \".wslconfig\" file failed to generate."
+    warn "The \".wslconfig\" file failed to generate."
 fi
