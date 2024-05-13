@@ -251,7 +251,7 @@ install_kernel() {
     log "Downloading kernel version $version..."
 
     if [[ -z "$version" ]]; then
-        log "Failed to find the latest version. Exiting."
+        fail "Failed to find the latest version. Exiting."
     fi
 
     download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-$version.tar.gz" "$parent/$version.tar.gz"
