@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2162,SC2317
 
-##  GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel.sh
-##  Purpose: Build Official WSL2 Kernels
-##  Updated: 05.13.24
-##  Script version: 3.1
+# GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel.sh
+# Purpose: Build Official WSL2 Kernels
+# Updated: 05.13.24
+# Script version: 3.1
 
 # Color variables
 RED='\033[0;31m'
