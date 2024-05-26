@@ -43,7 +43,7 @@ There are two methods to download and run the build script:
 
 2. **WSL Configuration:**
 
-   To use the new kernel, create a `.wslconfig` file at `%USERPROFILE%\.wslconfig` and configure it to point to your new kernel file. Detailed instructions and configuration options can be found in the [WSL configuration guide](https://learn.microsoft.com/en-us/windows/wsl/wsl-config).
+   To use the new kernel, create a `.wslconfig` file at `C:\Users\YOUR-USERNAME-HERE\.wslconfig` and configure it to point to your new kernel file. Detailed instructions and configuration options can be found in the [WSL configuration guide](https://learn.microsoft.com/en-us/windows/wsl/wsl-config).
 
    A sample `.wslconfig` file to get started can be found [here](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig).
 
