@@ -29,7 +29,7 @@ There are two methods to download and run the build script:
 
 - **Download Link for the Script:**
 
-  If you prefer manually downloading the script before executing, use this [direct download link for the build script](https://wsl.optimizethis.net).
+  If you prefer manually downloading the script before executing, use this [direct link](https://wsl.optimizethis.net).
 
 ### Post-Installation Steps
 
