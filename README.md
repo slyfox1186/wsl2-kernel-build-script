@@ -12,7 +12,7 @@ This document details the process of building the latest Microsoft WSL2 (Windows
 
 There are two methods to download and run the build script:
 
-- **Direct Download and Execution:**
+- **Download and Execution Methods:**
 
   - Download and execute the script in one step:
     ```sh
