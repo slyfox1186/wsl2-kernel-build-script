@@ -38,7 +38,7 @@ There are two methods to download and run the build script:
    The build script outputs a new kernel file named `vmlinux`. Move this file to a directory within your Windows user profile path. Example location:
    
    ```batch
-   %USERPROFILE%\WSL2\vmlinux
+    C:\Users\YOUR-USERNAME-HERE\WSL2\vmlinux
    ```
 
 2. **WSL Configuration:**
