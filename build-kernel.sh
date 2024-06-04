@@ -3,8 +3,8 @@
 
 # GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel.sh
 # Purpose: Build Official WSL2 Kernels
-# Updated: 05.13.24
-# Script version: 3.1
+# Updated: 06.04.24
+# Script version: 3.2
 
 # Color variables
 RED='\033[0;31m'
@@ -13,7 +13,8 @@ YELLOW='\033[0;33m'
 NC='\033[0m'
 
 show_help() {
-    echo "Usage: $(basename "$0") [options]"
+    script_name="${0##*/}"
+    echo "Usage: $script_name [options]"
     echo "Options:"
     echo "  -h, --help                            Show this help message."
     echo "  -v, --version VERSION                 Set a custom version number of the WSL2 kernel to install."
@@ -136,6 +137,10 @@ export CC="ccache gcc"
 export CXX="ccache g++"
 export CFLAGS="-O2 -pipe -march=native" # Aggressive optimization flags
 export CXXFLAGS="$CFLAGS" # Aggressive optimization flags
+export LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
+export CPPFLAGS="-I/usr/include"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
 
 announce_options() {
     # Announce options after all inputs have been processed
@@ -172,15 +177,25 @@ prompt_wsl_script() {
 }
 
 install_required_packages() {
-    local -a pkgs
-    local missing_packages
-    missing_packages=""
+    local -a pkgs missing_packages=()
+    local pkg
     pkgs=(
         bc bison build-essential ccache cmake curl debootstrap dwarves flex g++
         g++-s390x-linux-gnu gcc gcc-s390x-linux-gnu gdb-multiarch git libcap-dev
-        libelf-dev libncurses-dev libncurses5 libncursesw5 libncursesw5-dev
-        libssl-dev make pkg-config python3 qemu-system-misc qemu-utils rsync wget
+        libelf-dev libssl-dev make pahole pkg-config python3 qemu-system-misc
+        qemu-utils rsync wget
     )
+
+    # Determine additional packages based on the OS version
+    os_version=$(grep -oP '(?<=^VERSION_ID=")[^"]+' /etc/os-release)
+    case "$os_version" in
+        "24.04")
+            pkgs+=(libelf1t64 libncursesw6 libncurses-dev)
+            ;;
+        *)
+            pkgs+=(libncurses-dev libncurses5 libncursesw5 libncursesw5-dev)
+            ;;
+    esac
 
     for pkg in "${pkgs[@]}"; do
         if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -qo "ok installed"; then
@@ -188,9 +203,15 @@ install_required_packages() {
         fi
     done
 
-    if [[ -n "$missing_packages" ]]; then
-        log "Installing missing packages: $missing_packages"
-        sudo apt-get install -y $missing_packages
+    if [[ ${#missing_packages[@]} -gt 0 ]]; then
+        log "Installing missing packages: ${missing_packages[*]}"
+        for pkg in "${missing_packages[@]}"; do
+            if apt install -y "$pkg"; then
+                log "Successfully installed package: $pkg"
+            else
+                warn "Failed to install package: $pkg"
+            fi
+        done
     else
         log "All APT packages are already installed."
     fi
