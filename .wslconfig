@@ -1,11 +1,12 @@
 [wsl2]
-kernel=C:\\Users\\jholl\\WSL2\\vmlinux
+# Set the path to the custom kernel
+# kernel=C:\\Users\\jholl\\WSL2\\vmlinux-5-15-153-1
 # Limits VM memory to use no more than 4 GB, this can be set as whole numbers using GB or MB
-memory=32GB
+memory=48GB
 # Sets the VM virtual processors count
 processors=32
 # Sets amount of swap storage space to 16GB, default is 25% of available RAM
-swap=16GB
+swap=32GB
 # Sets swapfile path location, default is %LocalAppData%\\temp\\swap.vhdx
 swapFile=C:\\Users\\jholl\\AppData\\Local\\Temp\\swap.vhdx
 # Boolean to turn on or off support for GUI applications (WSLg) in WSL. Only available for Windows 11
@@ -15,12 +16,27 @@ debugConsole=false
 # Enables nested virtualization
 nestedVirtualization=true
 # The number of milliseconds that a VM is idle, before it is shut down. Only available for Windows 11
-vmIdleTimeout=3600000
+vmIdleTimeout=900000
+# Default true setting enables Windows to reclaim unused memory allocated to WSL 2 virtual machine.
+pageReporting=true
+# Enforces WSL to use Windows’ HTTP proxy information. Default: false
+autoProxy=true
+# Changes how DNS requests are proxied from WSL to Windows. Default: false
+dnsTunneling=true
+# Setting this to true allows the Windows Firewall rules, as well as rules specific to Hyper-V traffic, to filter WSL network traffic. Default: true
+firewall=true
+# If the value is mirrored then this turns on mirrored networking mode. Default or unrecognized strings result in NAT networking. Default: NAT
+networkingMode=NAT
+# Only applicable to networkingMode = NAT. Boolean to inform WSL to configure the DNS Server in Linux to the NAT on the host.
+# Setting to false will mirror DNS servers from Windows to Linux.  Default: true
+dnsProxy=false
+
 # Enable experimental features
 [experimental]
+# Automatically releases cached memory after detecting idle CPU usage. Set to gradual for slow release, and dropcache for instant release of cached memory. Default: disabled
 autoMemoryReclaim=gradual
-networkingMode=NAT
-dnsTunneling=true
-firewall=true
+# Only applicable when wsl2.dnsTunneling is set to true. When this option is set to false, DNS requests
+# tunneled from Linux will bypass cached names within Windows to always put the requests on the wire. Default: false
+useWindowsDnsCache=false
+# When set to true, any newly created VHD will be set to sparse automatically. Default: false
 sparseVhd=true
-autoProxy=true
