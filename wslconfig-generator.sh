@@ -253,5 +253,5 @@ autoProxy=${auto_proxy}
 EOL
 
 # Display the contents of the .wslconfig file
-echo "Generated .wslconfig file:"
+printf "\n%s\n\n" "Generated .wslconfig file:"
 cat .wslconfig
