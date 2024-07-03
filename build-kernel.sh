@@ -301,7 +301,7 @@ install_kernel() {
         cat "$error_log"
         fail "Kernel build failed. Please check the error log above for more information."
     else
-        locate_vmlinux=$(find "$PWD" -type f -name vmlinux | head -n1)
+        locate_vmlinux=$(find "$PWD" -maxdepth 1 -type f -name vmlinux | head -n1)
         if [[ -f "$locate_vmlinux" ]]; then
             cp -f "$locate_vmlinux" "$script_dir/vmlinux"
             log "Kernel build successful. vmlinux moved to the specified output directory: $script_dir"
