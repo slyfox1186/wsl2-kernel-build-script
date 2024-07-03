@@ -174,14 +174,14 @@ else
     exit 1
 fi
 
-# Get total physical memory in bytes from Windows using PowerShell
+# Get total physical memory in GB from Windows using PowerShell
 if [[ -z "$memory_value" ]]; then
-  total_memory_bytes=$("$pwsh_path" -NoL -NoP -C "Import-Module PowerShellGet; (Get-CimInstance -Class Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum" | tr -d '\r')
+  total_memory_gb=$("$pwsh_path" -NoL -NoP -C "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB" | tr -d '\r')
 
-  # Convert bytes to GB and round down to the nearest integer
-  if [[ $total_memory_bytes =~ ^[0-9]+$ ]]; then
-      total_memory_gb=$((total_memory_bytes / 1024 / 1024 / 1024))
-  else
+  # Round down to the nearest integer
+  total_memory_gb=${total_memory_gb%.*}
+
+  if [[ ! $total_memory_gb =~ ^[0-9]+$ ]]; then
       echo "Failed to retrieve total physical memory. Using default value of 0."
       total_memory_gb=0
   fi
