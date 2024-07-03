@@ -3,8 +3,8 @@
 
 # GitHub Script: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel.sh
 # Purpose: Build Official WSL2 Kernels
-# Updated: 06.04.24
-# Script version: 3.2
+# Updated: 07.03.24
+# Script version: 3.3
 
 # Color variables
 RED='\033[0;31m'
