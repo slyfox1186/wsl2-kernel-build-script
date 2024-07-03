@@ -133,13 +133,13 @@ else
 fi
 
 # Set compiler optimizations
-CC="ccache gcc"
-CXX="ccache g++"
+CC="gcc"
+CXX="g++"
 CFLAGS="-O2 -pipe -march=native" # Aggressive optimization flags
 CXXFLAGS="$CFLAGS" # Aggressive optimization flags
 LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
 CPPFLAGS="-I/usr/local/include -I/usr/include"
-PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+PATH="/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
 export CC CXX CFLAGS CXXFLAGS LDFLAGS CPPFLAGS PATH PKG_CONFIG_PATH
 
