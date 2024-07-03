@@ -133,14 +133,15 @@ else
 fi
 
 # Set compiler optimizations
-export CC="ccache gcc"
-export CXX="ccache g++"
-export CFLAGS="-O2 -pipe -march=native" # Aggressive optimization flags
-export CXXFLAGS="$CFLAGS" # Aggressive optimization flags
-export LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
-export CPPFLAGS="-I/usr/include"
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+CC="ccache gcc"
+CXX="ccache g++"
+CFLAGS="-O2 -pipe -march=native" # Aggressive optimization flags
+CXXFLAGS="$CFLAGS" # Aggressive optimization flags
+LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
+CPPFLAGS="-I/usr/local/include -I/usr/include"
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+export CC CXX CFLAGS CXXFLAGS LDFLAGS CPPFLAGS PATH PKG_CONFIG_PATH
 
 announce_options() {
     # Announce options after all inputs have been processed
