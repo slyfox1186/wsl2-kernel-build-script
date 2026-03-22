@@ -1,0 +1,20 @@
+[wsl2]
+# Set this to the Windows path where you store the custom kernel.
+kernel=C:\\Users\\<your-user>\\WSL2\\vmlinux
+memory=24GB
+processors=8
+swap=8GB
+# swapfile=C:\\Users\\<your-user>\\AppData\\Local\\Temp\\swap.vhdx
+guiApplications=true
+debugConsole=false
+nestedVirtualization=true
+vmIdleTimeout=60000
+networkingMode=nat
+dnsTunneling=true
+dnsProxy=true
+firewall=true
+autoProxy=true
+
+[experimental]
+autoMemoryReclaim=gradual
+sparseVhd=false

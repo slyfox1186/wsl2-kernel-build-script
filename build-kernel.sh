@@ -1,347 +1,435 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2162,SC2317
 
-# GitHub: https://github.com/slyfox1186/wsl2-kernel-build-script/blob/main/build-kernel.sh
-# Purpose: Build Official WSL2 Kernels
-# Updated: 07.03.24
-# Script version: 3.3
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Color variables
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m'
+readonly SCRIPT_NAME="${0##*/}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+readonly SCRIPT_VERSION="4.0.0"
+readonly KERNEL_REPO_URL="https://github.com/microsoft/WSL2-Linux-Kernel.git"
+readonly DEFAULT_KERNEL_SERIES="6"
+
+if [[ -t 1 ]]; then
+    readonly RED=$'\033[0;31m'
+    readonly GREEN=$'\033[0;32m'
+    readonly YELLOW=$'\033[0;33m'
+    readonly RESET=$'\033[0m'
+else
+    readonly RED=""
+    readonly GREEN=""
+    readonly YELLOW=""
+    readonly RESET=""
+fi
+
+readonly TARGET_UID="${SUDO_UID:-$(id -u)}"
+readonly TARGET_GID="${SUDO_GID:-$(id -g)}"
+
+output_directory="$PWD"
+kernel_version=""
+kernel_series=""
+generate_wslconfig="ask"
+keep_build_dir="false"
+list_versions_only="false"
+workspace=""
+archive_path=""
+source_dir=""
+build_log=""
+selected_version=""
+apt_updated="false"
 
 show_help() {
-    script_name="${0##*/}"
-    echo "Usage: $script_name [options]"
-    echo "Options:"
-    echo "  -h, --help                            Show this help message."
-    echo "  -v, --version VERSION                 Set a custom version number of the WSL2 kernel to install."
-    echo "  -o, --output-directory <DIRECTORY>    Specify where the vmlinux file should be placed after build."
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [options]
+
+Build the Microsoft WSL2 kernel from source and copy the resulting vmlinux file
+to the selected output directory.
+
+Options:
+  -h, --help                        Show this help message.
+  -V, --script-version              Show the script version.
+  -v, --version <version>           Build a specific WSL kernel tag version.
+      --series <5|6>                Build the latest version from a major series.
+  -o, --output-directory <dir>      Directory to receive the built vmlinux file.
+      --list-versions               Print available upstream kernel versions.
+      --generate-wslconfig          Run the local .wslconfig generator after build.
+      --skip-wslconfig              Skip the .wslconfig generator prompt.
+      --keep-build-dir              Preserve the temporary build directory.
+
+Examples:
+  sudo bash ${SCRIPT_NAME}
+  sudo bash ${SCRIPT_NAME} --series 6 --output-directory "\$HOME/WSL2"
+  sudo bash ${SCRIPT_NAME} --version 6.6.87.2 --skip-wslconfig
+EOF
 }
 
 log() {
-    echo -e "${GREEN}[INFO]${NC} $*"
+    printf '%s[INFO]%s %s\n' "$GREEN" "$RESET" "$*"
 }
 
 warn() {
-    echo -e "${YELLOW}[WARNING]${NC} $*"
+    printf '%s[WARN]%s %s\n' "$YELLOW" "$RESET" "$*" >&2
 }
 
 fail() {
-    echo -e "${RED}[ERROR]${NC} $*" >&2
+    printf '%s[ERROR]%s %s\n' "$RED" "$RESET" "$*" >&2
     exit 1
 }
 
-output_directory=""
-kernel_version=""
-version_type=""
-version_specified="false"
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
 
-# Parse command line options
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -v|--version)
-            version_specified="true"
-            kernel_version="$2"
-            shift 2
-            ;;
-        -o|--output-directory)
-            output_directory="$2"
-            shift 2
-            ;;
-        *)
-            fail "Invalid option: $1"
-            ;;
-    esac
-done
+cleanup() {
+    local status=$?
 
-# Check if the script is run with root privileges
-if [[ "$EUID" -ne 0 ]]; then
-    fail "You must run this script with root or sudo."
-fi
+    if [[ -z "$workspace" || ! -d "$workspace" ]]; then
+        return "$status"
+    fi
 
-list_available_versions() {
-    local version
+    if (( status != 0 )); then
+        warn "Build workspace preserved for inspection: $workspace"
+        return "$status"
+    fi
 
-    echo
-    log "Available kernel versions:"
-    echo
-    version=$(curl -fsS "https://github.com/microsoft/WSL2-Linux-Kernel/tags/" | grep -oP 'linux-msft-wsl-\K\d+([\d.])+(?=\.tar\.[a-z]+)' | sort -ruV)
+    if [[ "$keep_build_dir" == "true" ]]; then
+        log "Build workspace retained: $workspace"
+        return 0
+    fi
 
-    if [[ -n "$version" ]]; then
-        echo "$version"
-    else
-        echo "No version found."
+    rm -rf -- "$workspace"
+    return 0
+}
+
+trap cleanup EXIT
+
+ensure_root() {
+    [[ "$EUID" -eq 0 ]] || fail "Run this script with root privileges."
+}
+
+ensure_directory() {
+    mkdir -p -- "$1"
+}
+
+ensure_output_directory() {
+    ensure_directory "$output_directory"
+}
+
+own_file_for_user() {
+    local target=$1
+
+    if command_exists chown; then
+        chown "$TARGET_UID:$TARGET_GID" "$target" 2>/dev/null || true
     fi
 }
 
-# Prompting the user for input if no version specified
-if ! $version_specified; then
+apt_install_missing_packages() {
+    local -a required_packages=(
+        bc
+        bison
+        build-essential
+        ca-certificates
+        ccache
+        curl
+        dwarves
+        flex
+        git
+        libcap-dev
+        libelf-dev
+        libncurses-dev
+        libssl-dev
+        python3
+        rsync
+        wget
+        xz-utils
+    )
+    local -a missing_packages=()
+    local package
+
+    for package in "${required_packages[@]}"; do
+        if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q "ok installed"; then
+            missing_packages+=("$package")
+        fi
+    done
+
+    if [[ ${#missing_packages[@]} -eq 0 ]]; then
+        log "Build dependencies are already installed."
+        return
+    fi
+
+    log "Installing missing packages: ${missing_packages[*]}"
+
+    if [[ "$apt_updated" != "true" ]]; then
+        apt-get update
+        apt_updated="true"
+    fi
+
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing_packages[@]}"
+}
+
+fetch_available_versions() {
+    command_exists git || fail "git is required to resolve available kernel versions."
+
+    git ls-remote --tags --refs "$KERNEL_REPO_URL" 'refs/tags/linux-msft-wsl-*' |
+        awk '{print $2}' |
+        sed 's#refs/tags/linux-msft-wsl-##' |
+        grep -E '^[0-9]+(\.[0-9]+)*$' |
+        sort -Vru
+}
+
+list_available_versions() {
+    log "Available upstream kernel versions:"
+    fetch_available_versions
+}
+
+resolve_latest_version_for_series() {
+    local series=$1
+
+    fetch_available_versions | awk -F. -v target="$series" '$1 == target { print; exit }'
+}
+
+prompt_for_version_selection() {
+    local choice
+
     while true; do
-        echo
-        echo "Choose the WSL2 kernel version to download and install:"
-        echo
-        echo "1. Linux series 6 kernel"
-        echo "2. Linux series 5 kernel"
-        echo "3. Specific version"
-        echo "4. List available versions"
-        echo "5. Exit"
-        echo
-        read -rp "Enter your choice (1-5): " choice
+        cat <<'EOF'
+
+Choose the WSL2 kernel version to build:
+1. Latest Linux series 6 kernel
+2. Latest Linux series 5 kernel
+3. Specific version
+4. List available versions
+5. Exit
+EOF
+        read -r -p "Enter your choice (1-5): " choice
 
         case "$choice" in
             1)
-                version_type="6"
-                break
+                kernel_series="6"
+                return
                 ;;
             2)
-                version_type="5"
-                break
+                kernel_series="5"
+                return
                 ;;
             3)
-                read -rp "Enter the version numbers (e.g., 5.15.90.1): " choice
-                kernel_version="$choice"
-                version_specified=true
-                break
+                read -r -p "Enter the full version (example: 6.6.87.2): " kernel_version
+                [[ -n "$kernel_version" ]] || fail "A version value is required."
+                return
                 ;;
             4)
                 list_available_versions
                 ;;
             5)
-                echo "Exiting the script."
                 exit 0
                 ;;
             *)
-                fail "Invalid choice. Please try again."
+                warn "Invalid choice. Enter a number between 1 and 5."
                 ;;
         esac
     done
-fi
+}
 
-# Ensure the directory for 'vmlinux' is prepared.
-if [[ -z "$output_directory" ]]; then
-    script_dir="$PWD" # Use current directory if no output directory is specified
-else
-    script_dir="$output_directory"
-    mkdir -p "$script_dir" # Create output directory if it does not exist
-fi
-
-# Set compiler optimizations
-CC="gcc"
-CXX="g++"
-CFLAGS="-O2 -pipe -march=native" # Aggressive optimization flags
-CXXFLAGS="$CFLAGS" # Aggressive optimization flags
-LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
-CPPFLAGS="-I/usr/local/include -I/usr/include"
-PATH="/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
-export CC CXX CFLAGS CXXFLAGS LDFLAGS CPPFLAGS PATH PKG_CONFIG_PATH
-
-announce_options() {
-    # Announce options after all inputs have been processed
-    echo
-    echo "Final script configuration:"
-    echo "==================================="
-    log "Specific version specified: $version_specified"
-    if $version_specified; then
-        log "Specific version: $kernel_version"
-    else
-        log "Version: Using the latest available version"
+resolve_selected_version() {
+    if [[ -n "$kernel_version" ]]; then
+        selected_version="$kernel_version"
+        return
     fi
-    log "Output directory: ${output_directory:-"Default directory ($PWD)"}"
-}
 
-prompt_wsl_script() {
-    log "Do you want to run the automatic file generator for .wslconfig?"
-    read -rp "Please enter your choice (y/n): " choice
-    echo
-
-    case "$choice" in
-        [yY]*)
-            bash <(curl -fsSL "https://raw.githubusercontent.com/slyfox1186/wsl2-kernel-build-script/main/wslconfig-generator.sh")
-            ;;
-        [nN]*)
-            exit 0
-            ;;
-        *)
-           warn "Bad user input..."
-           unset choice
-           prompt_wsl_script
-           ;;
-    esac
-}
-
-install_required_packages() {
-    local -a pkgs missing_packages=()
-    local pkg
-    pkgs=(
-        bc bison build-essential ccache cmake curl debootstrap dwarves flex g++
-        g++-s390x-linux-gnu gcc gcc-s390x-linux-gnu gdb-multiarch git libcap-dev
-        libelf-dev libssl-dev make pahole pkg-config python3 qemu-system-misc
-        qemu-utils rsync wget
-    )
-
-    # Determine additional packages based on the OS version
-    os_version=$(grep -oP '(?<=^VERSION_ID=")[^"]+' /etc/os-release)
-    case "$os_version" in
-        "24.04")
-            pkgs+=(libelf1t64 libncursesw6 libncurses-dev)
-            ;;
-        *)
-            pkgs+=(libncurses-dev libncurses5 libncursesw5 libncursesw5-dev)
-            ;;
-    esac
-
-    for pkg in "${pkgs[@]}"; do
-        if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -qo "ok installed"; then
-            missing_packages+=("$pkg")
+    if [[ -z "$kernel_series" ]]; then
+        if [[ -t 0 ]]; then
+            prompt_for_version_selection
+        else
+            kernel_series="$DEFAULT_KERNEL_SERIES"
+            log "No version specified; defaulting to latest series ${kernel_series} kernel."
         fi
+    fi
+
+    selected_version="$(resolve_latest_version_for_series "$kernel_series")"
+    [[ -n "$selected_version" ]] || fail "Failed to resolve the latest series ${kernel_series} kernel version."
+}
+
+prepare_workspace() {
+    workspace="$(mktemp -d "${TMPDIR:-/tmp}/wsl2-kernel-build.XXXXXX")"
+    archive_path="${workspace}/kernel.tar.gz"
+    source_dir="${workspace}/source"
+    build_log="${workspace}/build.log"
+
+    mkdir -p -- "$source_dir"
+}
+
+download_source_archive() {
+    local version=$1
+    local archive_url="https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-${version}.tar.gz"
+
+    log "Downloading kernel source for ${version}..."
+    curl --fail --location --retry 3 --retry-delay 2 --silent --show-error \
+        --output "$archive_path" "$archive_url"
+}
+
+extract_source_archive() {
+    log "Extracting source archive..."
+    tar -xzf "$archive_path" -C "$source_dir" --strip-components=1
+    [[ -f "${source_dir}/Microsoft/config-wsl" ]] || fail "The upstream source archive is missing Microsoft/config-wsl."
+}
+
+run_logged() {
+    "$@" 2>&1 | tee -a "$build_log"
+}
+
+build_kernel() {
+    log "Preparing kernel configuration..."
+    cp -- "${source_dir}/Microsoft/config-wsl" "${source_dir}/.config"
+
+    (
+        cd -- "$source_dir"
+        run_logged make olddefconfig
+        run_logged make -j"$(nproc --all)"
+        run_logged make modules_install headers_install
+    )
+}
+
+copy_vmlinux() {
+    local source_vmlinux="${source_dir}/vmlinux"
+    local destination="${output_directory}/vmlinux"
+
+    [[ -f "$source_vmlinux" ]] || fail "Kernel build completed without producing vmlinux."
+
+    install -m 0644 "$source_vmlinux" "$destination"
+    own_file_for_user "$destination"
+
+    log "Kernel build complete. vmlinux written to ${destination}"
+}
+
+prompt_wslconfig_generation() {
+    local choice
+
+    if [[ "$generate_wslconfig" == "false" ]]; then
+        return
+    fi
+
+    if [[ "$generate_wslconfig" == "true" ]]; then
+        run_wslconfig_generator
+        return
+    fi
+
+    [[ -t 0 ]] || return
+
+    while true; do
+        read -r -p "Run the local .wslconfig generator now? (y/n): " choice
+        case "$choice" in
+            [Yy]*)
+                run_wslconfig_generator
+                return
+                ;;
+            [Nn]*)
+                return
+                ;;
+            *)
+                warn "Enter y or n."
+                ;;
+        esac
+    done
+}
+
+run_wslconfig_generator() {
+    local generator_path="${SCRIPT_DIR}/wslconfig-generator.sh"
+
+    [[ -x "$generator_path" || -f "$generator_path" ]] || fail "Unable to find ${generator_path}."
+
+    log "Launching the local .wslconfig generator..."
+    bash "$generator_path"
+
+    if [[ -f "${PWD}/.wslconfig" ]]; then
+        own_file_for_user "${PWD}/.wslconfig"
+        log ".wslconfig written to ${PWD}/.wslconfig"
+    fi
+}
+
+print_next_steps() {
+    cat <<EOF
+
+Next steps:
+  1. Copy ${output_directory}/vmlinux somewhere stable on Windows, for example:
+     C:\\Users\\<your-user>\\WSL2\\vmlinux
+  2. Point your Windows .wslconfig file at that kernel path.
+  3. Run 'wsl --shutdown' from Windows to apply the new kernel.
+EOF
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -V|--script-version)
+                printf '%s\n' "$SCRIPT_VERSION"
+                exit 0
+                ;;
+            -v|--version)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                kernel_version="$2"
+                shift 2
+                ;;
+            --series)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                [[ "$2" =~ ^[56]$ ]] || fail "Kernel series must be 5 or 6."
+                kernel_series="$2"
+                shift 2
+                ;;
+            -o|--output-directory)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                output_directory="$2"
+                shift 2
+                ;;
+            --list-versions)
+                list_versions_only="true"
+                shift
+                ;;
+            --generate-wslconfig)
+                generate_wslconfig="true"
+                shift
+                ;;
+            --skip-wslconfig)
+                generate_wslconfig="false"
+                shift
+                ;;
+            --keep-build-dir)
+                keep_build_dir="true"
+                shift
+                ;;
+            *)
+                fail "Unknown option: $1"
+                ;;
+        esac
     done
 
-    if [[ ${#missing_packages[@]} -gt 0 ]]; then
-        log "Installing missing packages: ${missing_packages[*]}"
-        for pkg in "${missing_packages[@]}"; do
-            if apt install -y "$pkg"; then
-                log "Successfully installed package: $pkg"
-            else
-                warn "Failed to install package: $pkg"
-            fi
-        done
-    else
-        log "All APT packages are already installed."
+    if [[ -n "$kernel_version" && -n "$kernel_series" ]]; then
+        warn "Both --version and --series were supplied; --version takes precedence."
     fi
 }
 
-download_file() {
-    local output_file url
-    url="$1"
-    output_file="$2"
+main() {
+    parse_args "$@"
 
-    if [[ -s "$output_file" ]]; then
-        log "File $output_file already exists and is not empty. Skipping download."
-        return 0
+    if [[ "$list_versions_only" == "true" ]]; then
+        list_available_versions
+        exit 0
     fi
 
-    if ! command -v wget &>/dev/null; then
-        echo "wget is not installed. Please install wget."
-        exit 1
-    fi
-    log "Downloading with wget..."
-    wget --show-progress -cqO "$output_file" "$url"
+    ensure_root
+    ensure_output_directory
+    apt_install_missing_packages
+    resolve_selected_version
+    prepare_workspace
+    download_source_archive "$selected_version"
+    extract_source_archive
+    build_kernel
+    copy_vmlinux
+    print_next_steps
+    prompt_wslconfig_generation
 }
 
-source_the_latest_release_version() {
-    local version_type
-    version_type="$1"
-
-    curl -fsS "https://github.com/microsoft/WSL2-Linux-Kernel/tags/" | grep -oP "linux-msft-wsl-\K${version_type}\.([\d.])+(?=\.tar\.[a-z]+)" | head -n1
-}
-
-build_kernel_without_progress() {
-    echo
-    echo "Installing the WSL2 Kernel"
-    echo "========================================="
-    echo
-    if ! echo "yes" | make "-j$(nproc --all)" KCONFIG_CONFIG="Microsoft/config-wsl" 2>>"$error_log"; then
-        log "Build process terminated with errors. Please check the error log below:"
-        cat "$error_log"
-        return 1
-    fi
-    if ! make modules_install headers_install; then
-        fail "Failed to make modules and install headers"
-    fi
-    return 0
-}
-
-install_kernel() {
-    clear
-    announce_options
-    install_required_packages
-
-    if [[ -n "$kernel_version" ]]; then
-        version="$kernel_version"
-    else
-        version=$(source_the_latest_release_version "$version_type")
-    fi
-
-    log "Downloading kernel version $version..."
-
-    if [[ -z "$version" ]]; then
-        fail "Failed to find the latest version. Exiting."
-    fi
-
-    download_file "https://github.com/microsoft/WSL2-Linux-Kernel/archive/refs/tags/linux-msft-wsl-$version.tar.gz" "$parent/$version.tar.gz"
-
-    log "Successfully downloaded the source code file \"$version\""
-
-    # Remove any leftover files from previous runs
-    [[ -d "$working" ]] && rm -fr "$working"
-
-    # Get the working directory ready
-    mkdir -p "$working"
-
-    if ! tar -zxf "$parent/$version.tar.gz" -C "$working" --strip-components 1; then
-        warn "Failed to extract the archive. Deleting the corrupt archive."
-        rm -f "$parent/$version.tar.gz"
-        log "The archive file has been deleted due to extraction failure. Please re-run the script."
-        exit 1
-    fi
-
-    cd "$working" || exit 1
-    log "Building the kernel..."
-    if ! build_kernel_without_progress; then
-        rm -fr "$working"
-        log "Error log:"
-        cat "$error_log"
-        fail "Kernel build failed. Please check the error log above for more information."
-    else
-        locate_vmlinux=$(find "$PWD" -maxdepth 1 -type f -name vmlinux | head -n1)
-        if [[ -f "$locate_vmlinux" ]]; then
-            cp -f "$locate_vmlinux" "$script_dir/vmlinux"
-            log "Kernel build successful. vmlinux moved to the specified output directory: $script_dir"
-
-            local choice
-            read -rp "Do you want to delete the build directory? (y/n): " choice
-            if [[ "$choice" = "y" ]]; then
-                rm -fr "$working"
-                log "Build directory cleaned up."
-            else
-                log "Build directory retained as per user choice."
-            fi
-        else
-            fail "Error: vmlinux file not found. Please check the build process."
-        fi
-    fi
-}
-
-# Run the kernel building code
-cwd="$PWD"
-parent="/tmp/wsl2-build-script"
-working="$parent/working"
-error_log="$parent/error.log"
-
-# Create the parent parent directory and the build directory within it
-mkdir -p "$parent"
-cd "$parent" || exit 1
-
-install_kernel
-if [[ -f "$cwd/vmlinux" ]]; then
-    log "The file \"vmlinux\" can be found in this script's directory."
-else
-    warn "Failed to move the file \"vmlinux\" to the script's directory."
-fi
-
-# Prompt and run the .wslconfig generator script
-cd "$cwd" || exit 1
-prompt_wsl_script
-if [[ -f ".wslconfig" ]]; then
-    log "The \".wslconfig\" file can be found in this script's directory."
-else
-    warn "The \".wslconfig\" file failed to generate."
-fi
+main "$@"

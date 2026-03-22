@@ -1,78 +1,12 @@
 #!/usr/bin/env bash
 
-# Function to normalize paths
-normalize_path() {
-  local path="$1"
-  # Replace any number of backslashes with two backslashes
-  path="$(echo "$path" | sed -E 's/\\{1,}/\\\\/g')"
-  echo "$path"
-}
+set -Eeuo pipefail
+IFS=$'\n\t'
 
-# Display the banner
-echo "====================================================================="
-echo "                     WSL Configuration Generator                    "
-echo "====================================================================="
-echo "This script generates a .wslconfig file based on your PC's specs and"
-echo "allows you to customize various WSL settings. The generated file    "
-echo "will be saved in the current directory.                             "
-echo
-echo "You can use command line arguments to set specific values for the   "
-echo "non-determined variables. Run the script with -h or --help to see   "
-echo "the available options.                                              "
-echo "====================================================================="
-echo
+readonly SCRIPT_NAME="${0##*/}"
+readonly DEFAULT_OUTPUT_PATH=".wslconfig"
 
-# Function to display the help menu
-display_help() {
-    echo "Usage: $0 [OPTIONS]"
-    echo
-    echo "Options:"
-    echo "  -h, --help                                  Display this help menu"
-    echo "  -e, --examples                              Display example values for non-determined variables"
-    echo
-    echo "  -k, --kernel                <path>          Set the kernel path"
-    echo "  -f, --swapfile              <path>          Set the swapfile path"
-    echo "  --auto-proxy                <boolean>       Enable or disable auto proxy (default: true)"
-    echo "  --dns-tunneling             <boolean>       Enable or disable DNS tunneling (default: true)"
-    echo "  --firewall                  <boolean>       Enable or disable the firewall (default: true)"
-    echo "  --sparse-vhd                <boolean>       Enable or disable sparse VHD (default: true)"
-    echo "  -d, --debug-console         <boolean>       Enable or disable debug console (default: false)"
-    echo "  -g, --gui-applications      <boolean>       Enable or disable GUI applications support (WSLg) (default: true)"
-    echo "  -n, --nested-virtualization <boolean>       Enable or disable nested virtualization (default: true)"
-    echo "  -t, --vm-idle-timeout       <seconds>       Set the VM idle timeout in seconds (default: 900)"
-    echo "  --auto-memory-reclaim       <option>        Set the auto memory reclaim option (disabled, gradual, sudden) (default: gradual)"
-    echo "  --networking-mode           <option>        Set the networking mode (NAT, Bridged, Default) (default: NAT)"
-    echo "  -m, --memory                <size>          Set the memory size in GB (overrides automatic detection)"
-    echo "  -s, --swap                  <size>          Set the swap size in GB (overrides automatic detection)"
-    echo "  -p, --processors            <number>        Set the number of processors (overrides automatic detection)"
-    echo
-    echo "Example: ./wsl-config-generator.sh --kernel \"C:\\\\Users\\\\jholl\\\\WSL2\\\\vmlinux\" -m 24 -p 8"
-    echo
-}
-
-# Function to display example values
-display_examples() {
-  echo "Example values for non-determined variables:"
-  echo
-  echo "kernel=\"C:\\\\Users\\\\jholl\\\\WSL2\\\\vmlinux\""
-  echo "memory=\"32\""
-  echo "processors=\"8\""
-  echo "swap=\"16\""
-  echo "swapFile=\"C:\\\\Users\\\\jholl\\\\AppData\\\\Local\\\\Temp\\\\swap.vhdx\""
-  echo "guiApplications=\"true\""
-  echo "debugConsole=\"false\""
-  echo "nestedVirtualization=\"true\""
-  echo "vmIdleTimeout=\"900\""
-  echo "autoMemoryReclaim=\"gradual\""
-  echo "networkingMode=\"NAT\""
-  echo "dnsTunneling=\"true\""
-  echo "firewall=\"true\""
-  echo "sparseVhd=\"true\""
-  echo "autoProxy=\"true\""
-  echo
-}
-
-# Default values
+output_path="$DEFAULT_OUTPUT_PATH"
 kernel_path=""
 memory_value=""
 num_processors=""
@@ -81,177 +15,422 @@ swapfile_path=""
 gui_applications="true"
 debug_console="false"
 nested_virtualization="true"
-vm_idle_timeout="900"
+vm_idle_timeout_seconds="60"
 auto_memory_reclaim="gradual"
-networking_mode="NAT"
+networking_mode="nat"
 dns_tunneling="true"
+dns_proxy="true"
 firewall="true"
-sparse_vhd="true"
+sparse_vhd="false"
 auto_proxy="true"
+total_memory_gb=""
+logical_processors=""
+pwsh_path=""
 
-# Parse command line arguments
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    -k|--kernel)
-      kernel_path=$(normalize_path "$2")
-      shift ;;
-    -m|--memory) memory_value="$2"; shift ;;
-    -p|--processors) num_processors="$2"; shift ;;
-    -s|--swap) swap_size="$2"; shift ;;
-    -f|--swapfile)
-      swapfile_path=$(normalize_path "$2")
-      shift ;;
-    -g|--gui-applications)
-      case $2 in
-        true|false) gui_applications="$2" ;;
-        *) echo "Invalid value for --gui-applications. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    -d|--debug-console)
-      case $2 in
-        true|false) debug_console="$2" ;;
-        *) echo "Invalid value for --debug-console. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    -n|--nested-virtualization)
-      case $2 in
-        true|false) nested_virtualization="$2" ;;
-        *) echo "Invalid value for --nested-virtualization. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    -t|--vm-idle-timeout) vm_idle_timeout="$2"; shift ;;
-    --auto-memory-reclaim)
-      case $2 in
-        disabled|gradual|sudden) auto_memory_reclaim="$2" ;;
-        *) echo "Invalid value for --auto-memory-reclaim. Use 'disabled', 'gradual', or 'sudden'."; exit 1 ;;
-      esac
-      shift ;;
-    --networking-mode)
-      case $2 in
-        NAT|Bridged|Default) networking_mode="$2" ;;
-        *) echo "Invalid value for --networking-mode. Use 'NAT', 'Bridged', or 'Default'."; exit 1 ;;
-      esac
-      shift ;;
-    --dns-tunneling)
-      case $2 in
-        true|false) dns_tunneling="$2" ;;
-        *) echo "Invalid value for --dns-tunneling. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    --firewall)
-      case $2 in
-        true|false) firewall="$2" ;;
-        *) echo "Invalid value for --firewall. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    --sparse-vhd)
-      case $2 in
-        true|false) sparse_vhd="$2" ;;
-        *) echo "Invalid value for --sparse-vhd. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    --auto-proxy)
-      case $2 in
-        true|false) auto_proxy="$2" ;;
-        *) echo "Invalid value for --auto-proxy. Use 'true' or 'false'."; exit 1 ;;
-      esac
-      shift ;;
-    -e|--examples) display_examples; exit 0 ;;
-    -h|--help) display_help; exit 0 ;;
-    *) echo "Unknown option: $1"; display_help; exit 1 ;;
-  esac
-  shift
-done
+show_help() {
+    cat <<EOF
+Usage: ${SCRIPT_NAME} [options]
 
-# Define the path to powershell.exe
-if [[ -d "/c/Windows/System32/WindowsPowerShell/v1.0" ]]; then
-    pwsh_path="/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
-elif [[ -d "/mnt/c/Windows/System32/WindowsPowerShell/v1.0" ]]; then
-    pwsh_path="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
-else
-    echo "The script failed to located the file powershell.exe."
-    echo "Please change the variable \"\pwsh_path\" and point it to this file to continue."
+Generate a Windows .wslconfig file using detected host hardware values or
+explicit overrides.
+
+Options:
+  -h, --help                            Show this help text.
+  -e, --examples                        Print example values and exit.
+  -o, --output <path>                   Output file path. Default: ${DEFAULT_OUTPUT_PATH}
+  -k, --kernel <path>                   Windows or WSL path to vmlinux.
+  -f, --swapfile <path>                 Windows or WSL path to the swap VHDX file.
+  -m, --memory <size>                   Memory limit. Accepts 24 or 24GB or 24576MB.
+  -s, --swap <size>                     Swap size. Accepts 8 or 8GB or 8192MB.
+  -p, --processors <count>              Processor count.
+  -t, --vm-idle-timeout <seconds>       Idle timeout in seconds. Default: 60.
+  -d, --debug-console <true|false>      Enable debug console.
+  -g, --gui-applications <true|false>   Enable WSLg GUI support.
+  -n, --nested-virtualization <true|false>
+                                        Enable nested virtualization.
+      --auto-memory-reclaim <mode>      disabled, gradual, dropCache
+      --networking-mode <mode>          nat, mirrored, bridged, none, virtioproxy
+      --dns-tunneling <true|false>      Enable DNS tunneling.
+      --dns-proxy <true|false>          Configure DNS proxy when using NAT.
+      --firewall <true|false>           Let Windows Firewall filter WSL traffic.
+      --sparse-vhd <true|false>         Create new VHDs as sparse files.
+      --auto-proxy <true|false>         Import Windows proxy settings into WSL.
+
+Examples:
+  ${SCRIPT_NAME} --kernel 'C:\\Users\\me\\WSL2\\vmlinux' --memory 24 --processors 8
+  ${SCRIPT_NAME} --kernel /mnt/c/Users/me/WSL2/vmlinux --swapfile /mnt/c/Temp/swap.vhdx
+EOF
+}
+
+show_examples() {
+    cat <<'EOF'
+Example values:
+  kernel="C:\\Users\\me\\WSL2\\vmlinux"
+  memory="24GB"
+  processors="8"
+  swap="8GB"
+  swapfile="C:\\Users\\me\\AppData\\Local\\Temp\\swap.vhdx"
+  guiApplications="true"
+  debugConsole="false"
+  nestedVirtualization="true"
+  vmIdleTimeout="60000"
+  networkingMode="nat"
+  dnsTunneling="true"
+  dnsProxy="true"
+  firewall="true"
+  autoProxy="true"
+  autoMemoryReclaim="gradual"
+  sparseVhd="false"
+EOF
+}
+
+fail() {
+    printf '[ERROR] %s\n' "$*" >&2
     exit 1
-fi
+}
 
-# Get total physical memory in GB from Windows using PowerShell
-if [[ -z "$memory_value" ]]; then
-  total_memory_gb=$("$pwsh_path" -NoL -NoP -C "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB" | tr -d '\r')
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
 
-  # Round down to the nearest integer
-  total_memory_gb=${total_memory_gb%.*}
+normalize_boolean() {
+    local value=${1,,}
 
-  if [[ ! $total_memory_gb =~ ^[0-9]+$ ]]; then
-      echo "Failed to retrieve total physical memory. Using default value of 0."
-      total_memory_gb=0
-  fi
+    case "$value" in
+        true|false)
+            printf '%s\n' "$value"
+            ;;
+        *)
+            fail "Invalid boolean value: $1"
+            ;;
+    esac
+}
 
-  # Calculate the memory value based on the total physical memory
-  if [[ $total_memory_gb -gt 64 ]]; then
-      memory_value=48
-  elif [[ $total_memory_gb -eq 64 ]]; then
-      memory_value=32
-  elif [[ $total_memory_gb -ge 48 && $total_memory_gb -lt 64 ]]; then
-      memory_value=24
-  elif [[ $total_memory_gb -ge 32 && $total_memory_gb -lt 48 ]]; then
-      memory_value=16
-  elif [[ $total_memory_gb -ge 16 && $total_memory_gb -lt 32 ]]; then
-      memory_value=8
-  elif [[ $total_memory_gb -ge 8 && $total_memory_gb -lt 16 ]]; then
-      memory_value=4
-  elif [[ $total_memory_gb -lt 4 ]]; then
-      echo "Error: Insufficient memory. The script requires at least 4GB of RAM."
-      exit 1
-  fi
-fi
+normalize_size() {
+    local value=${1^^}
 
-# Get number of processors
-if [[ -z "$num_processors" ]]; then
-  num_processors=$(nproc --all)
-fi
+    if [[ "$value" =~ ^[0-9]+$ ]]; then
+        printf '%sGB\n' "$value"
+        return
+    fi
 
-# Calculate the swap size as 25% of the total memory if not provided by the user
-if [[ -z "$swap_size" ]]; then
-  swap_size=$(awk "BEGIN {printf \"%.0f\", ${total_memory_gb} * 0.25}")
-fi
+    if [[ "$value" =~ ^[0-9]+(GB|MB)$ ]]; then
+        printf '%s\n' "$value"
+        return
+    fi
 
-# Convert VM idle timeout from seconds to milliseconds
-vm_idle_timeout_ms=$((vm_idle_timeout * 1000))
+    fail "Invalid size value: $1. Use values like 24, 24GB, or 24576MB."
+}
 
-# Create the .wslconfig file with filled in values
-cat > .wslconfig <<EOL
+validate_non_negative_integer() {
+    local value=$1
+    local label=$2
+
+    [[ "$value" =~ ^[0-9]+$ ]] || fail "${label} must be a non-negative integer."
+}
+
+validate_positive_integer() {
+    local value=$1
+    local label=$2
+
+    validate_non_negative_integer "$value" "$label"
+    (( value > 0 )) || fail "${label} must be greater than zero."
+}
+
+normalize_windows_path() {
+    local raw_path=$1
+    local windows_path=$raw_path
+
+    if [[ "$raw_path" == /* ]] && command_exists wslpath; then
+        windows_path="$(wslpath -w "$raw_path" 2>/dev/null || true)"
+        if [[ -z "$windows_path" ]]; then
+            windows_path="$raw_path"
+        fi
+    fi
+
+    windows_path="${windows_path//\//\\}"
+    printf '%s\n' "$windows_path" | sed -E 's#\\+#\\\\#g'
+}
+
+find_powershell() {
+    if command_exists powershell.exe; then
+        pwsh_path="$(command -v powershell.exe)"
+        return
+    fi
+
+    if [[ -x "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]]; then
+        pwsh_path="/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+        return
+    fi
+
+    if [[ -x "/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" ]]; then
+        pwsh_path="/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+        return
+    fi
+
+    fail "Unable to locate powershell.exe. Run this script from WSL on a Windows host."
+}
+
+run_powershell() {
+    "$pwsh_path" -NoLogo -NoProfile -NonInteractive -Command "$1" | tr -d '\r'
+}
+
+detect_windows_specs() {
+    find_powershell
+
+    if [[ -z "$total_memory_gb" ]]; then
+        local total_memory_bytes
+        total_memory_bytes="$(run_powershell '(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory')"
+        [[ "$total_memory_bytes" =~ ^[0-9]+$ ]] || fail "Failed to detect Windows physical memory."
+        total_memory_gb=$(( total_memory_bytes / 1024 / 1024 / 1024 ))
+        (( total_memory_gb > 0 )) || fail "Detected Windows physical memory is invalid."
+    fi
+
+    if [[ -z "$logical_processors" ]]; then
+        logical_processors="$(run_powershell '(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors')"
+        [[ "$logical_processors" =~ ^[0-9]+$ ]] || fail "Failed to detect the number of Windows logical processors."
+    fi
+}
+
+recommend_memory_size() {
+    local recommended=$(( total_memory_gb / 2 ))
+
+    if (( recommended < 2 )); then
+        recommended=2
+    fi
+
+    printf '%sGB\n' "$recommended"
+}
+
+recommend_swap_size() {
+    local recommended=$(( (total_memory_gb + 3) / 4 ))
+
+    if (( recommended < 1 )); then
+        recommended=1
+    fi
+
+    printf '%sGB\n' "$recommended"
+}
+
+normalize_networking_mode() {
+    local mode=${1,,}
+
+    case "$mode" in
+        nat|mirrored|bridged|none|virtioproxy)
+            printf '%s\n' "$mode"
+            ;;
+        *)
+            fail "Invalid networking mode: $1"
+            ;;
+    esac
+}
+
+normalize_auto_memory_reclaim() {
+    case "${1,,}" in
+        disabled|gradual)
+            printf '%s\n' "${1,,}"
+            ;;
+        dropcache)
+            printf '%s\n' "dropCache"
+            ;;
+        *)
+            fail "Invalid auto memory reclaim mode: $1"
+            ;;
+    esac
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -e|--examples)
+                show_examples
+                exit 0
+                ;;
+            -o|--output)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                output_path="$2"
+                shift 2
+                ;;
+            -k|--kernel)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                kernel_path="$(normalize_windows_path "$2")"
+                shift 2
+                ;;
+            -f|--swapfile)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                swapfile_path="$(normalize_windows_path "$2")"
+                shift 2
+                ;;
+            -m|--memory)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                memory_value="$(normalize_size "$2")"
+                shift 2
+                ;;
+            -s|--swap)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                swap_size="$(normalize_size "$2")"
+                shift 2
+                ;;
+            -p|--processors)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                validate_positive_integer "$2" "Processor count"
+                num_processors="$2"
+                shift 2
+                ;;
+            -t|--vm-idle-timeout)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                validate_non_negative_integer "$2" "VM idle timeout"
+                vm_idle_timeout_seconds="$2"
+                shift 2
+                ;;
+            -d|--debug-console)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                debug_console="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            -g|--gui-applications)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                gui_applications="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            -n|--nested-virtualization)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                nested_virtualization="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            --auto-memory-reclaim)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                auto_memory_reclaim="$(normalize_auto_memory_reclaim "$2")"
+                shift 2
+                ;;
+            --networking-mode)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                networking_mode="$(normalize_networking_mode "$2")"
+                shift 2
+                ;;
+            --dns-tunneling)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                dns_tunneling="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            --dns-proxy)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                dns_proxy="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            --firewall)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                firewall="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            --sparse-vhd)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                sparse_vhd="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            --auto-proxy)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                auto_proxy="$(normalize_boolean "$2")"
+                shift 2
+                ;;
+            *)
+                fail "Unknown option: $1"
+                ;;
+        esac
+    done
+}
+
+populate_detected_defaults() {
+    if [[ -z "$memory_value" || -z "$swap_size" || -z "$num_processors" ]]; then
+        detect_windows_specs
+    fi
+
+    if [[ -z "$memory_value" ]]; then
+        memory_value="$(recommend_memory_size)"
+    fi
+
+    if [[ -z "$swap_size" ]]; then
+        swap_size="$(recommend_swap_size)"
+    fi
+
+    if [[ -z "$num_processors" ]]; then
+        num_processors="$logical_processors"
+    fi
+}
+
+write_config() {
+    local vm_idle_timeout_ms=$(( vm_idle_timeout_seconds * 1000 ))
+    local kernel_line="# kernel=C:\\\\Users\\\\<your-user>\\\\WSL2\\\\vmlinux"
+    local swapfile_line="# swapfile=C:\\\\Users\\\\<your-user>\\\\AppData\\\\Local\\\\Temp\\\\swap.vhdx"
+    local detected_memory_comment=""
+
+    if [[ -n "$kernel_path" ]]; then
+        kernel_line="kernel=${kernel_path}"
+    fi
+
+    if [[ -n "$swapfile_path" ]]; then
+        swapfile_line="swapfile=${swapfile_path}"
+    fi
+
+    if [[ -n "$total_memory_gb" ]]; then
+        detected_memory_comment="# Detected Windows memory: ${total_memory_gb}GB"
+    fi
+
+    cat >"$output_path" <<EOF
 [wsl2]
-# Specify a custom Linux kernel to use with your installed distros. The default kernel used can be found at https://github.com/microsoft/WSL2-Linux-Kernel
-kernel=${kernel_path:-C:\\\\path\\\\to\\\\vmlinux}
-# Limits VM memory to use no more than 4 GB, this can be set as whole numbers using GB or MB
-# Total memory: ${total_memory_gb}GB
-# Setting memory to: ${memory_value}GB
-memory=${memory_value}GB
-# Sets the VM virtual processors count
+# Specify a custom Linux kernel to use with your installed distros.
+${kernel_line}
+# Limit the VM memory usage.
+${detected_memory_comment}
+memory=${memory_value}
+# Set the VM virtual processor count.
 processors=${num_processors}
-# Sets amount of swap storage space, default is 25% of available RAM
-swap=${swap_size}GB
-# Sets swapfile path location, default is %LocalAppData%\\temp\\swap.vhdx
-# swapFile=${swapfile_path:-C:\\\\path\\\\to\\\\swap\\\\file\\\\swap.vhdx}
-# Boolean to turn on or off support for GUI applications (WSLg) in WSL. Only available for Windows 11
+# Set swap size. The WSL default is 25% of host RAM.
+swap=${swap_size}
+# Optional custom swapfile path.
+${swapfile_line}
+# GUI support for Linux applications (WSLg).
 guiApplications=${gui_applications}
-# Turns on or off output console showing contents of dmesg when opening a WSL 2 distro for debugging
+# Show a debug console with dmesg output when the distro starts.
 debugConsole=${debug_console}
-# Enables nested virtualization
+# Enable nested virtualization.
 nestedVirtualization=${nested_virtualization}
-# The number of milliseconds that a VM is idle, before it is shut down. Only available for Windows 11
+# Milliseconds before an idle VM is shut down.
 vmIdleTimeout=${vm_idle_timeout_ms}
-
-# Enable experimental features
-[experimental]
-autoMemoryReclaim=${auto_memory_reclaim}
+# Network mode. Common values are nat and mirrored.
 networkingMode=${networking_mode}
+# Configure DNS tunneling through Windows.
 dnsTunneling=${dns_tunneling}
+# Configure DNS proxy behavior when using NAT.
+dnsProxy=${dns_proxy}
+# Allow Windows Firewall and Hyper-V rules to filter WSL traffic.
 firewall=${firewall}
-sparseVhd=${sparse_vhd}
+# Import Windows proxy settings into WSL.
 autoProxy=${auto_proxy}
-EOL
 
-# Display the contents of the .wslconfig file
-printf "\n%s\n\n" "Generated .wslconfig file:"
-cat .wslconfig
+[experimental]
+# Automatic reclaim policy for cached memory.
+autoMemoryReclaim=${auto_memory_reclaim}
+# Create newly generated VHD files as sparse files.
+sparseVhd=${sparse_vhd}
+EOF
+}
+
+print_summary() {
+    printf '\nGenerated %s:\n\n' "$output_path"
+    cat "$output_path"
+    printf '\nApply changes by running "wsl --shutdown" from Windows.\n'
+}
+
+main() {
+    parse_args "$@"
+    populate_detected_defaults
+    write_config
+    print_summary
+}
+
+main "$@"

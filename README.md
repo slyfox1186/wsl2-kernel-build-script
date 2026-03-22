@@ -1,50 +1,82 @@
-# Windows WSL2 Kernel Build Script
+# WSL2 Kernel Build Script
 
-## Overview
+Build a custom Microsoft WSL2 kernel from source, then generate a matching Windows `.wslconfig` file. The project is intended for Debian or Ubuntu environments running inside WSL2.
 
-This document details the process of building the latest Microsoft WSL2 (Windows Subsystem for Linux 2) kernel from source. The source code is available on Microsoft's official [GitHub page](https://github.com/microsoft/WSL2-Linux-Kernel/). This guide is specifically designed for users looking to update their WSL2 kernels for Debian or Ubuntu distributions running on x86_64 architecture.
+## What Changed
 
-### Purpose
+- The build script now uses strict bash settings, safer temp directory handling, and a local `.wslconfig` generator instead of executing a remote script.
+- Kernel version discovery now uses `git ls-remote` against the upstream Microsoft repository, not brittle HTML parsing and not the GitHub API.
+- The `.wslconfig` generator now validates inputs, detects Windows hardware from PowerShell, and writes current settings into the correct `[wsl2]` and `[experimental]` sections.
+- CI, linting, smoke tests, and basic repo hygiene files have been added.
 
-- To compile and integrate the latest Microsoft WSL2 kernel release with your current Linux distributions on WSL2.
+## Requirements
 
-### Installation Instructions
+- WSL2 on Windows with a Debian or Ubuntu distro
+- `sudo` access inside the distro
+- Internet access to download the upstream kernel source
 
-There are two methods to download and execute the build script:
+The build script installs missing packages automatically with `apt-get`.
 
-- Direct:
-  ```sh
-  curl -Lso build-kernel.sh https://wsl.optimizethis.net
-  sudo bash build-kernel.sh
-  ```
+## Usage
 
-- Git Clone:
-  ```sh
-  git clone https://github.com/slyfox1186/wsl2-kernel-build-script.git
-  cd wsl2-kernel-build-script
-  sudo bash build-kernel.sh
-  ```
+Clone the repository and run the build:
 
-- **Download Link for the Script:**
+```sh
+git clone https://github.com/slyfox1186/wsl2-kernel-build-script.git
+cd wsl2-kernel-build-script
+sudo bash build-kernel.sh
+```
 
-  If you prefer manually downloading the script before executing, use this [direct link](https://wsl.optimizethis.net).
+Build a specific version:
 
-### Post-Installation Steps
+```sh
+sudo bash build-kernel.sh --version 6.6.87.2 --output-directory "$HOME/WSL2"
+```
 
-1. **Kernel File Relocation:**
+Build the latest kernel from a major series:
 
-   The build script outputs a new kernel file named `vmlinux`. Move this file to a directory within your Windows user profile path. Example location:
-   
-   ```batch
-    C:\Users\YOUR-USERNAME-HERE\WSL2\vmlinux
-   ```
+```sh
+sudo bash build-kernel.sh --series 6 --skip-wslconfig
+```
 
-2. **WSL Configuration:**
+List upstream versions:
 
-   To use the new kernel, create a `.wslconfig` file at `C:\Users\YOUR-USERNAME-HERE\.wslconfig` and configure it to point to your new kernel file. Detailed instructions and configuration options can be found in the [WSL configuration guide](https://learn.microsoft.com/en-us/windows/wsl/wsl-config).
+```sh
+bash build-kernel.sh --list-versions
+```
 
-   A sample `.wslconfig` file to get started can be found [here](https://github.com/slyfox1186/windows-wsl2-kernel-build-script/blob/main/.wslconfig).
+Generate only `.wslconfig`:
 
-### Additional Resources
+```sh
+bash wslconfig-generator.sh --kernel /mnt/c/Users/you/WSL2/vmlinux
+```
 
-- For more information on `.wslconfig` options, please consult the [Microsoft Documentation](https://learn.microsoft.com/en-us/windows/wsl/wsl-config).
+## Output
+
+The kernel build produces `vmlinux` in your selected output directory. Store that file somewhere stable on Windows, for example:
+
+```text
+C:\Users\<your-user>\WSL2\vmlinux
+```
+
+Create `C:\Users\<your-user>\.wslconfig` and point `kernel=` at that file. A sample config lives at `.wslconfig.example`.
+
+After updating the Windows config, apply the change from PowerShell or Command Prompt:
+
+```powershell
+wsl --shutdown
+```
+
+## Development
+
+Run the local checks before pushing changes:
+
+```sh
+make lint
+make smoke
+```
+
+## References
+
+- Microsoft WSL2 kernel source: <https://github.com/microsoft/WSL2-Linux-Kernel/>
+- Microsoft WSL configuration docs: <https://learn.microsoft.com/windows/wsl/wsl-config>
