@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+shopt -s inherit_errexit
 IFS=$'\n\t'
 
 readonly SCRIPT_NAME="${0##*/}"
@@ -10,7 +11,7 @@ readonly SCRIPT_VERSION="4.0.0"
 readonly KERNEL_REPO_URL="https://github.com/microsoft/WSL2-Linux-Kernel.git"
 readonly DEFAULT_KERNEL_SERIES="6"
 
-if [[ -t 1 ]]; then
+if [[ -z "${NO_COLOR-}" && -t 1 && -t 2 ]]; then
     readonly RED=$'\033[0;31m'
     readonly GREEN=$'\033[0;32m'
     readonly YELLOW=$'\033[0;33m'
@@ -274,7 +275,10 @@ extract_source_archive() {
 }
 
 run_logged() {
-    "$@" 2>&1 | tee -a "$build_log"
+    {
+        printf '\n===== %s | %s =====\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+        "$@"
+    } 2>&1 | tee -a -- "$build_log"
 }
 
 build_kernel() {

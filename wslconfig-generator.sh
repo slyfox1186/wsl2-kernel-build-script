@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+shopt -s inherit_errexit
 IFS=$'\n\t'
 
 readonly SCRIPT_NAME="${0##*/}"
@@ -172,7 +173,7 @@ find_powershell() {
 }
 
 run_powershell() {
-    "$pwsh_path" -NoLogo -NoProfile -NonInteractive -Command "$1" | tr -d '\r'
+    "$pwsh_path" -NoLogo -NoProfile -NonInteractive -Command "$1" 2>/dev/null | tr -d '\r'
 }
 
 detect_windows_specs() {
