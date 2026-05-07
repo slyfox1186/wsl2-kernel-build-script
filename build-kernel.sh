@@ -38,6 +38,7 @@ source_dir=""
 build_log=""
 selected_version=""
 apt_updated="false"
+config_path=""
 
 show_help() {
     cat <<EOF
@@ -52,6 +53,12 @@ Options:
   -v, --version <version>           Build a specific WSL kernel tag version.
       --series <5|6>                Build the latest version from a major series.
   -o, --output-directory <dir>      Directory to receive the built vmlinux file.
+  -c, --config <path>               Use this kernel .config instead of the
+                                    upstream Microsoft/config-wsl. If omitted,
+                                    a 'config-wsl' file shipped next to this
+                                    script is used when present (full CAN
+                                    bus support, etc.); otherwise the upstream
+                                    config from the source tarball is used.
       --list-versions               Print available upstream kernel versions.
       --generate-wslconfig          Run the local .wslconfig generator after build.
       --skip-wslconfig              Skip the .wslconfig generator prompt.
@@ -61,6 +68,7 @@ Examples:
   sudo bash ${SCRIPT_NAME}
   sudo bash ${SCRIPT_NAME} --series 6 --output-directory "\$HOME/WSL2"
   sudo bash ${SCRIPT_NAME} --version 6.6.87.2 --skip-wslconfig
+  sudo bash ${SCRIPT_NAME} --config ./my-config-wsl
 EOF
 }
 
@@ -281,9 +289,31 @@ run_logged() {
     } 2>&1 | tee -a -- "$build_log"
 }
 
+resolve_kernel_config() {
+    if [[ -n "$config_path" ]]; then
+        log "Using kernel config from --config: $config_path"
+        printf '%s\n' "$config_path"
+        return
+    fi
+
+    local bundled="${SCRIPT_DIR}/config-wsl"
+    if [[ -f "$bundled" ]]; then
+        log "Using bundled kernel config: $bundled"
+        printf '%s\n' "$bundled"
+        return
+    fi
+
+    local upstream="${source_dir}/Microsoft/config-wsl"
+    log "Using upstream kernel config: $upstream"
+    printf '%s\n' "$upstream"
+}
+
 build_kernel() {
+    local effective_config
+    effective_config="$(resolve_kernel_config)"
+
     log "Preparing kernel configuration..."
-    cp -- "${source_dir}/Microsoft/config-wsl" "${source_dir}/.config"
+    cp -- "$effective_config" "${source_dir}/.config"
 
     (
         cd -- "$source_dir"
@@ -386,6 +416,12 @@ parse_args() {
             -o|--output-directory)
                 [[ $# -ge 2 ]] || fail "Missing value for $1."
                 output_directory="$2"
+                shift 2
+                ;;
+            -c|--config)
+                [[ $# -ge 2 ]] || fail "Missing value for $1."
+                [[ -f "$2" ]] || fail "Config file not found: $2"
+                config_path="$(cd -- "$(dirname -- "$2")" && pwd)/$(basename -- "$2")"
                 shift 2
                 ;;
             --list-versions)

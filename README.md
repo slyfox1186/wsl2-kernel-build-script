@@ -7,6 +7,7 @@ Build a custom Microsoft WSL2 kernel from source, then generate a matching Windo
 - The build script now uses strict bash settings, safer temp directory handling, and a local `.wslconfig` generator instead of executing a remote script.
 - Kernel version discovery now uses `git ls-remote` against the upstream Microsoft repository, not brittle HTML parsing and not the GitHub API.
 - The `.wslconfig` generator now validates inputs, detects Windows hardware from PowerShell, and writes current settings into the correct `[wsl2]` and `[experimental]` sections.
+- A `config-wsl` file with full CAN bus support is bundled in the repo and is used automatically by `build-kernel.sh` (override with `--config <path>`).
 - CI, linting, smoke tests, and basic repo hygiene files have been added.
 
 ## Requirements
@@ -50,6 +51,24 @@ Generate only `.wslconfig`:
 ```sh
 bash wslconfig-generator.sh --kernel /mnt/c/Users/you/WSL2/vmlinux
 ```
+
+## Kernel configuration
+
+The repo ships a `config-wsl` file with full Linux CAN bus support enabled (raw, BCM, GW, J1939, ISO-TP, vcan, vxcan, plus the common controller and USB drivers). When `build-kernel.sh` runs, it picks the kernel `.config` in this order:
+
+1. `--config <path>` if you pass one explicitly.
+2. The repo's `config-wsl` if it exists alongside `build-kernel.sh`.
+3. Upstream `Microsoft/config-wsl` from the kernel source tarball.
+
+`make olddefconfig` is then run inside the kernel tree, so any options new to the kernel version you build will be initialized to their defaults without prompting.
+
+To use your own config, point at it:
+
+```sh
+sudo bash build-kernel.sh --config /path/to/my-config-wsl
+```
+
+To force the upstream Microsoft default instead of the bundled config, rename or delete `config-wsl` in the repo before running the script.
 
 ## Output
 
