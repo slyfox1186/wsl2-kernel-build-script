@@ -96,13 +96,12 @@ bash wslconfig-generator.sh \
 
 ## Development
 
-Install `shellcheck` and `shfmt`, then run the offline checks:
+Lint both scripts with `shellcheck` and `shfmt`; shfmt reads its style from `.editorconfig`:
 
 ```sh
-make check
+shellcheck build-kernel.sh wslconfig-generator.sh
+shfmt --diff build-kernel.sh wslconfig-generator.sh
 ```
-
-`make format` applies the shfmt style configured in `.editorconfig`. The VHDX test runs only when `fakeroot`, `mke2fs`, `debugfs` and `qemu-img` are installed.
 
 ## References
 
