@@ -74,24 +74,24 @@ EOF
 
 show_examples() {
     cat <<'EOF'
-Example values:
-  kernel="C:\\Users\\me\\WSL2\\bzImage"
-  kernelModules="C:\\Users\\me\\WSL2\\modules.vhdx"
-  memory="24GB"
-  processors="8"
-  swap="8GB"
-  swapfile="C:\\Users\\me\\AppData\\Local\\Temp\\swap.vhdx"
-  guiApplications="true"
-  debugConsole="false"
-  nestedVirtualization="true"
-  vmIdleTimeout="60000"
-  networkingMode="nat"
-  dnsTunneling="true"
-  dnsProxy="true"
-  firewall="true"
-  autoProxy="true"
-  autoMemoryReclaim="dropCache"
-  sparseVhd="false"
+Example values, as written to .wslconfig:
+  kernel=C:\\Users\\me\\WSL2\\bzImage
+  kernelModules=C:\\Users\\me\\WSL2\\modules.vhdx
+  memory=24GB
+  processors=8
+  swap=8GB
+  swapFile=C:\\Users\\me\\AppData\\Local\\Temp\\swap.vhdx
+  guiApplications=true
+  debugConsole=false
+  nestedVirtualization=true
+  vmIdleTimeout=60000
+  networkingMode=nat
+  dnsTunneling=true
+  dnsProxy=true
+  firewall=true
+  autoProxy=true
+  autoMemoryReclaim=dropCache
+  sparseVhd=false
 EOF
 }
 
@@ -117,24 +117,16 @@ normalize_boolean() {
     esac
 }
 
+# Prints the size with a unit (a bare number means GB), or 0 for any zero size.
 normalize_size() {
-    local value=${1^^}
+    [[ "${1^^}" =~ ^0*([0-9]+)(GB|MB)?$ ]] ||
+        fail "Invalid size value: $1. Use values like 24, 24GB, or 24576MB."
 
-    if [[ "$value" =~ ^[0-9]+$ ]]; then
-        if ((10#$value == 0)); then
-            printf '0\n'
-        else
-            printf '%sGB\n' "$value"
-        fi
-        return
+    if [[ "${BASH_REMATCH[1]}" == "0" ]]; then
+        printf '0\n'
+    else
+        printf '%s%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]:-GB}"
     fi
-
-    if [[ "$value" =~ ^[0-9]+(GB|MB)$ ]]; then
-        printf '%s\n' "$value"
-        return
-    fi
-
-    fail "Invalid size value: $1. Use values like 24, 24GB, or 24576MB."
 }
 
 validate_non_negative_integer() {

@@ -84,7 +84,7 @@ Remove the two lines from `.wslconfig` to return to Microsoft's kernel.
 
 ## .wslconfig generator
 
-`wslconfig-generator.sh` writes a `.wslconfig` from detected Windows memory and processor counts or from explicit values. It covers the documented `[wsl2]` and `[experimental]` settings. If the output file already exists, the previous version is kept as `<file>.bak`.
+`wslconfig-generator.sh` writes a `.wslconfig` from detected Windows memory and processor counts or from explicit values. It writes the common `[wsl2]` and `[experimental]` settings; the [WSL configuration reference](https://learn.microsoft.com/windows/wsl/wsl-config) lists the rest. If the output file already exists, the previous version is kept as `<file>.bak`.
 
 ```sh
 bash wslconfig-generator.sh \

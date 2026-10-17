@@ -13,6 +13,3 @@ indent_size = 4
 # shfmt reads these keys when run without formatting flags.
 [*.sh]
 switch_case_indent = true
-
-[Makefile]
-indent_style = tab

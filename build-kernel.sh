@@ -140,28 +140,27 @@ absolute_path() {
     printf '%s/%s\n' "$directory" "$(basename -- "$path")"
 }
 
+# The workspace is released once the artifacts are installed, so a tree still
+# present at exit belongs to a failed build.
 cleanup() {
     local status=$?
 
-    if [[ -z "$workspace" || ! -d "$workspace" ]]; then
-        return "$status"
-    fi
-
-    if ((status != 0)); then
+    if [[ -n "$workspace" && -d "$workspace" ]]; then
         warn "Build tree preserved for inspection: ${workspace}"
         if [[ -n "$build_log" && -f "$build_log" ]]; then
             warn "Build log: ${build_log}"
         fi
-        return "$status"
     fi
+    return "$status"
+}
 
+release_workspace() {
     if [[ "$keep_build_dir" == "true" ]]; then
         log "Build tree retained: ${workspace}"
-        return 0
+    else
+        rm -rf -- "$workspace"
     fi
-
-    rm -rf -- "$workspace"
-    return 0
+    workspace=""
 }
 
 run_as_root() {
@@ -388,13 +387,14 @@ download_source() {
 }
 
 # Fails unless every assignment in the fragments survived into the final config.
+# A later fragment overrides an earlier one, as in merge_config.sh.
 # "# CONFIG_X is not set" and CONFIG_X=n are satisfied by an absent symbol.
 verify_config_fragments() {
     local final_config=$1
     shift
-    local -A final_values=()
-    local -a mismatches=()
-    local fragment line symbol expected actual
+    local -A final_values=() expected_values=() expected_sources=()
+    local -a symbols=() mismatches=()
+    local fragment line symbol value actual
 
     while IFS= read -r line || [[ -n "$line" ]]; do
         if [[ "$line" =~ ^(CONFIG_[A-Za-z0-9_]+)=(.*)$ ]]; then
@@ -406,19 +406,27 @@ verify_config_fragments() {
         while IFS= read -r line || [[ -n "$line" ]]; do
             if [[ "$line" =~ ^(CONFIG_[A-Za-z0-9_]+)=(.*)$ ]]; then
                 symbol=${BASH_REMATCH[1]}
-                expected=${BASH_REMATCH[2]}
+                value=${BASH_REMATCH[2]}
             elif [[ "$line" =~ ^#\ (CONFIG_[A-Za-z0-9_]+)\ is\ not\ set$ ]]; then
                 symbol=${BASH_REMATCH[1]}
-                expected="n"
+                value="n"
             else
                 continue
             fi
 
-            actual="${final_values[$symbol]-n}"
-            if [[ "$actual" != "$expected" ]]; then
-                mismatches+=("${symbol}: requested ${expected}, got ${actual} (${fragment##*/})")
+            if [[ -z "${expected_values[$symbol]+set}" ]]; then
+                symbols+=("$symbol")
             fi
+            expected_values["$symbol"]=$value
+            expected_sources["$symbol"]=${fragment##*/}
         done <"$fragment"
+    done
+
+    for symbol in "${symbols[@]}"; do
+        actual="${final_values[$symbol]-n}"
+        if [[ "$actual" != "${expected_values[$symbol]}" ]]; then
+            mismatches+=("${symbol}: requested ${expected_values[$symbol]}, got ${actual} (${expected_sources[$symbol]})")
+        fi
     done
 
     if ((${#mismatches[@]} > 0)); then
@@ -766,6 +774,7 @@ main() {
     build_kernel
     create_modules_vhdx
     install_artifacts
+    release_workspace
     print_next_steps
     prompt_wslconfig_generation
 }

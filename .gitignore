@@ -4,8 +4,6 @@
 bzImage-*
 modules-*.vhdx
 config-[0-9]*
-# Output of build-kernel.sh before 5.0.0.
-vmlinux
 
 # Local development tooling, kept out of the published repository.
 Makefile
