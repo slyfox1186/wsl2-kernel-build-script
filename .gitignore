@@ -1,2 +1,8 @@
+# Build and generator outputs written to the working directory.
 .wslconfig
+.wslconfig.bak
+bzImage-*
+modules-*.vhdx
+config-[0-9]*
+# Output of build-kernel.sh before 5.0.0.
 vmlinux

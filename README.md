@@ -1,101 +1,111 @@
 # WSL2 Kernel Build Script
 
-Build a custom Microsoft WSL2 kernel from source, then generate a matching Windows `.wslconfig` file. The project is intended for Debian or Ubuntu environments running inside WSL2.
-
-## What Changed
-
-- The build script now uses strict bash settings, safer temp directory handling, and a local `.wslconfig` generator instead of executing a remote script.
-- Kernel version discovery now uses `git ls-remote` against the upstream Microsoft repository, not brittle HTML parsing and not the GitHub API.
-- The `.wslconfig` generator now validates inputs, detects Windows hardware from PowerShell, and writes current settings into the correct `[wsl2]` and `[experimental]` sections.
-- A `config-wsl` file with full CAN bus support is bundled in the repo and is used automatically by `build-kernel.sh` (override with `--config <path>`).
-- CI, linting, smoke tests, and basic repo hygiene files have been added.
+Build Microsoft's WSL2 kernel from source with full CAN bus support, then generate a matching Windows `.wslconfig`. The build follows the steps in the [upstream README](https://github.com/microsoft/WSL2-Linux-Kernel) and produces the two files WSL loads: the kernel image (`kernel=`) and the modules VHDX (`kernelModules=`).
 
 ## Requirements
 
-- WSL2 on Windows with a Debian or Ubuntu distro
-- `sudo` access inside the distro
-- Internet access to download the upstream kernel source
-
-The build script installs missing packages automatically with `apt-get`.
+- WSL2 on x86_64 Windows with an Ubuntu or Debian distribution
+- `sudo` access, used only to install missing build packages with `apt-get`
+- 20 GB free on a Linux filesystem for the temporary build tree (default `/var/tmp`)
+- Internet access to `github.com`
 
 ## Usage
 
-Clone the repository and run the build:
+Run the build as your regular user:
 
 ```sh
 git clone https://github.com/slyfox1186/wsl2-kernel-build-script.git
 cd wsl2-kernel-build-script
-sudo bash build-kernel.sh
+bash build-kernel.sh
 ```
 
-Build a specific version:
+In a terminal the script asks which version to build; otherwise it builds the newest upstream release. Common variations:
 
 ```sh
-sudo bash build-kernel.sh --version 6.6.87.2 --output-directory "$HOME/WSL2"
-```
+# Newest release of the 6.6 series, written straight to a Windows folder
+bash build-kernel.sh --series 6.6 --output-directory /mnt/c/Users/you/WSL2
 
-Build the latest kernel from a major series:
+# An exact upstream tag
+bash build-kernel.sh --version 6.18.54.1
 
-```sh
-sudo bash build-kernel.sh --series 6 --skip-wslconfig
-```
-
-List upstream versions:
-
-```sh
+# List the upstream tags
 bash build-kernel.sh --list-versions
 ```
 
-Generate only `.wslconfig`:
-
-```sh
-bash wslconfig-generator.sh --kernel /mnt/c/Users/you/WSL2/vmlinux
-```
+Run `bash build-kernel.sh --help` for every option, including `--jobs`, `--build-dir` and `--keep-build-dir`.
 
 ## Kernel configuration
 
-The repo ships a `config-wsl` file with full Linux CAN bus support enabled (raw, BCM, GW, J1939, ISO-TP, vcan, vxcan, plus the common controller and USB drivers). When `build-kernel.sh` runs, it picks the kernel `.config` in this order:
+The script starts from `Microsoft/config-wsl` of the exact version it builds, then merges config fragments with the kernel's `scripts/kconfig/merge_config.sh` and runs `make olddefconfig`. Because the base always matches the source tree, new kernel options get Microsoft's values instead of generic defaults.
 
-1. `--config <path>` if you pass one explicitly.
-2. The repo's `config-wsl` if it exists alongside `build-kernel.sh`.
-3. Upstream `Microsoft/config-wsl` from the kernel source tarball.
+The bundled fragment `wsl-can.config` enables the Linux CAN stack: raw, BCM, gateway, J1939, ISO-TP, vcan, vxcan, and the common PCI, ISA and USB controller drivers. It also disables BTF type information; delete that line from the fragment to keep Microsoft's default.
 
-`make olddefconfig` is then run inside the kernel tree, so any options new to the kernel version you build will be initialized to their defaults without prompting.
+After configuration the script checks that every value in every fragment reached the final `.config`, and it stops with a list of any value Kconfig dropped.
 
-To use your own config, point at it:
+| Option | Effect |
+| --- | --- |
+| `--fragment <path>` | Merge another fragment. Repeatable. |
+| `--stock-config` | Skip the bundled CAN fragment. |
+| `--config <path>` | Use a full `.config` as the base instead of Microsoft's. |
 
-```sh
-sudo bash build-kernel.sh --config /path/to/my-config-wsl
+A fragment uses `.config` syntax. For example, this file adds the WireGuard module:
+
+```text
+CONFIG_WIREGUARD=m
 ```
-
-To force the upstream Microsoft default instead of the bundled config, rename or delete `config-wsl` in the repo before running the script.
 
 ## Output
 
-The kernel build produces `vmlinux` in your selected output directory. Store that file somewhere stable on Windows, for example:
+The output directory receives:
 
-```text
-C:\Users\<your-user>\WSL2\vmlinux
+| File | Purpose |
+| --- | --- |
+| `bzImage-<version>` | Kernel image for `kernel=` |
+| `modules-<version>.vhdx` | Modules and kernel headers for `kernelModules=`; on 6.18 and later it also holds `perf` |
+| `config-<version>` | The final kernel configuration |
+
+The VHDX uses the `<release>/{modules,linux-headers,perf}` layout that current WSL mounts. Modules are installed without debug sections and every file is owned by root, as in the kernel Microsoft ships.
+
+WSL reads both files from the Windows filesystem, so keep them on a Windows drive such as `C:\Users\<you>\WSL2`. Then point `%UserProfile%\.wslconfig` at them, using doubled backslashes:
+
+```ini
+[wsl2]
+kernel=C:\\Users\\<you>\\WSL2\\bzImage-6.18.54.1
+kernelModules=C:\\Users\\<you>\\WSL2\\modules-6.18.54.1.vhdx
 ```
 
-Create `C:\Users\<your-user>\.wslconfig` and point `kernel=` at that file. A sample config lives at `.wslconfig.example`.
-
-After updating the Windows config, apply the change from PowerShell or Command Prompt:
+Apply the change from PowerShell or Command Prompt, then check `uname -r` inside WSL:
 
 ```powershell
 wsl --shutdown
 ```
 
-## Development
+Remove the two lines from `.wslconfig` to return to Microsoft's kernel.
 
-Run the local checks before pushing changes:
+## .wslconfig generator
+
+`wslconfig-generator.sh` writes a `.wslconfig` from detected Windows memory and processor counts or from explicit values. It covers the documented `[wsl2]` and `[experimental]` settings. If the output file already exists, the previous version is kept as `<file>.bak`.
 
 ```sh
-make lint
-make smoke
+bash wslconfig-generator.sh \
+    --kernel /mnt/c/Users/you/WSL2/bzImage-6.18.54.1 \
+    --kernel-modules /mnt/c/Users/you/WSL2/modules-6.18.54.1.vhdx
 ```
+
+`build-kernel.sh --generate-wslconfig` runs it after a build and fills in both paths when the output directory is on a Windows drive. `.wslconfig.example` shows a complete file.
+
+## Development
+
+Install `shellcheck` and `shfmt`, then run the offline checks:
+
+```sh
+make check
+```
+
+`make format` applies the shfmt style configured in `.editorconfig`. The VHDX test runs only when `fakeroot`, `mke2fs`, `debugfs` and `qemu-img` are installed.
 
 ## References
 
-- Microsoft WSL2 kernel source: <https://github.com/microsoft/WSL2-Linux-Kernel/>
-- Microsoft WSL configuration docs: <https://learn.microsoft.com/windows/wsl/wsl-config>
+- Microsoft WSL2 kernel source: <https://github.com/microsoft/WSL2-Linux-Kernel>
+- WSL configuration reference: <https://learn.microsoft.com/windows/wsl/wsl-config>
+- Kernel build requirements: <https://docs.kernel.org/process/changes.html>

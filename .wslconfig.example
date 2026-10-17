@@ -1,20 +1,37 @@
 [wsl2]
-# Set this to the Windows path where you store the custom kernel.
-kernel=C:\\Users\\<your-user>\\WSL2\\vmlinux
+# Custom Linux kernel image (bzImage) on the Windows filesystem.
+kernel=C:\\Users\\<your-user>\\WSL2\\bzImage-6.18.54.1
+# Modules VHDX built for that kernel.
+kernelModules=C:\\Users\\<your-user>\\WSL2\\modules-6.18.54.1.vhdx
+# VM memory limit.
 memory=24GB
+# Virtual processor count.
 processors=8
+# Swap size; 0 disables swap. The WSL default is 25% of host memory.
 swap=8GB
-# swapfile=C:\\Users\\<your-user>\\AppData\\Local\\Temp\\swap.vhdx
+# Swap VHDX location. The WSL default is %Temp%\swap.vhdx.
+# swapFile=C:\\Users\\<your-user>\\AppData\\Local\\Temp\\swap.vhdx
+# GUI support for Linux applications (WSLg).
 guiApplications=true
+# Console window with dmesg output at distro start (Windows 11).
 debugConsole=false
+# Nested virtualization inside WSL 2 (Windows 11).
 nestedVirtualization=true
+# Milliseconds before an idle VM shuts down (Windows 11).
 vmIdleTimeout=60000
+# Network mode: nat, mirrored, none or consomme.
 networkingMode=nat
+# Proxy DNS requests through Windows.
 dnsTunneling=true
+# Point Linux DNS at the NAT on the host (NAT mode only).
 dnsProxy=true
+# Let Windows Firewall and Hyper-V rules filter WSL traffic.
 firewall=true
+# Use the Windows HTTP proxy settings.
 autoProxy=true
 
 [experimental]
-autoMemoryReclaim=gradual
+# Reclaim cached memory: disabled, gradual or dropCache.
+autoMemoryReclaim=dropCache
+# Create new VHDs as sparse files.
 sparseVhd=false

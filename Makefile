@@ -1,19 +1,23 @@
 SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: lint test smoke
+SCRIPTS := build-kernel.sh wslconfig-generator.sh tests/run-tests.sh
+
+.PHONY: check lint format test list-versions
+
+# Offline gate: lint plus the test suite.
+check: lint test
 
 lint:
-	shellcheck build-kernel.sh wslconfig-generator.sh
+	shellcheck -x $(SCRIPTS)
+	shfmt --diff $(SCRIPTS)
 
-test: lint
-	bash -n build-kernel.sh
-	bash -n wslconfig-generator.sh
+format:
+	shfmt --write $(SCRIPTS)
 
-smoke: test
-	bash build-kernel.sh --help >/dev/null
-	bash build-kernel.sh --script-version >/dev/null
-	bash wslconfig-generator.sh --help >/dev/null
-	bash wslconfig-generator.sh --examples >/dev/null
-	bash wslconfig-generator.sh --output /tmp/wslconfig.test --memory 8 --swap 2 --processors 4 >/dev/null
-	test -f /tmp/wslconfig.test
-	rm -f /tmp/wslconfig.test
+test:
+	bash tests/run-tests.sh
+
+# Needs network access to github.com.
+list-versions:
+	bash build-kernel.sh --list-versions

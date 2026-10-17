@@ -1,12 +1,18 @@
 root = true
 
-[*.{sh,md}]
+[*]
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{sh,md}]
 indent_style = space
 indent_size = 4
-trim_trailing_whitespace = true
+
+# shfmt reads these keys when run without formatting flags.
+[*.sh]
+switch_case_indent = true
 
 [Makefile]
 indent_style = tab
